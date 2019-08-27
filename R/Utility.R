@@ -561,7 +561,7 @@ unpack = function(filelist="") {
                   "run_artsandcrafts","run_food_residue","run_other_sources","run_products",
                   "source_chem_ac","source_chem_food","source_chem_products","source_chem_others",
                   "source_scen_food","source_scen_products","source_scen_others",
-                  "source_vars_products","source_vars_others")
+                  "source_vars_products","source_vars_others","README","run_CPDat")
   }
   inlib <- paste0(getwd(),"/inputs")
   if (dir.exists(inlib)) {
@@ -570,6 +570,7 @@ unpack = function(filelist="") {
     infile  <- filelist[[i]]
     extension <- ".csv"
     if (tolower(substr(infile,1,3))=="run") extension <- ".txt"
+    if (tolower(substr(infile,1,3))=="REA") extension <- ".txt"
     csvfile <- paste0(tolower(infile),extension)
        name<-system.file("extdata", csvfile, package = "ShedsHT")
        cat("\n Unpacking ",name)
