@@ -570,7 +570,7 @@ unpack = function(filelist="") {
     infile  <- filelist[[i]]
     extension <- ".csv"
     if (tolower(substr(infile,1,3))=="run") extension <- ".txt"
-    if (tolower(substr(infile,1,3))=="REA") extension <- ".txt"
+    if (tolower(substr(infile,1,3))=="rea") extension <- ".txt"
     csvfile <- paste0(tolower(infile),extension)
        name<-system.file("extdata", csvfile, package = "ShedsHT")
        cat("\n Unpacking ",name)

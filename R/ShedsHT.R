@@ -101,7 +101,6 @@ run = function(run.file="", wd="") {
       cvar.list <- unique(schem$varname)
       n.cvar    <- length(cvar.list)
       chem.data <- as.data.frame(array(0,c(n.per,n.cvar)))
-      #chem.datatest<<-chem.data
       setnames(chem.data,names(chem.data),cvar.list)
       src.means <- as.data.table(array(0,c(n.csrc+1,8)))
       setnames(src.means,names(src.means),c("exp.dermal","exp.ingest","exp.inhal","dose.inhal",
@@ -125,7 +124,6 @@ run = function(run.file="", wd="") {
         if (length(svar.list>0)) setnames(sdata,names(sdata),svar.list)
         io <- scens$indoor
         if (any(names(sdata)=="use.freq")) {sdata$use.today<-p.round(sdata$use.freq/365)}
-        test<<-sdata
         if(scens$dietary==1) {
           dietary <- food.residue(chem.data,cb,src)
           add     <- dietary$exp.ingest.dietary
@@ -135,7 +133,6 @@ run = function(run.file="", wd="") {
           cb$exp.dietary.tot <- cb$exp.dietary.tot + add
         }
         if(scens$dirderm==1) {
-          #sdatatest<-sdata
           dir.derm                <- dir.dermal(sdata,chem.data)
           add                     <- dir.derm$exp.dermal.dirderm
           src.means$exp.dermal[s] <- src.means$exp.dermal[s] +mean(add)

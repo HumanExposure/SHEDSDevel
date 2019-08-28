@@ -54,7 +54,7 @@ To load the package, enter the following in your R session:
 
 Usually, if you do not see any error message or warning, it can be assumed that package "ShedsHT" has been successfully installed. Before executing any queries, please take a look at the user manual (this document) as well as a reference manual (help pages for each function). 
 
-Documentation for all the SHEDS-HT code functions are in the file "SHEDS-reference.pdf".   The SHEDS-HT Technical Manual provides details of the model algorithms and data.  The SHEDS-HT Quick Start Guide is a short manual that provides straighforward instructions for getting SHEDS running quickly.
+Documentation for all the SHEDS-HT code functions are in the file "ShedsHT_0.#.#.pdf". The SHEDS-HT Technical Manual provides details of the model algorithms and data.  The SHEDS-HT Quick Start Guide is a short manual that provides straighforward instructions for getting SHEDS running quickly.
 
 Default input files for SHEDS-HT are  included in the R package, and can be accessed using the unpack() function.  The most up to date version of these files are found in the SHEDS-HT release Github repository.
 
