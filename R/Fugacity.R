@@ -273,9 +273,9 @@ chem.fug = function(n.per,cprops,x) {
 #'
 #' @export
 
-get.fug.concs = function(sdata,chem.data,x,cfug) {
+get.fug.concs = function(sdata,frac.chem,x,cfug) {
   n            <- nrow(x)
-  chem.mass    <- 1E6 * sdata$mass * chem.data$f.chemical        # sdata$mass [g], chem.mass [ug]
+  chem.mass    <- 1E6 * sdata$mass * frac.chem                   # sdata$mass [g], chem.mass [ug]
   app.rate.sur <- chem.mass/x$area.sur                           # app.rate.sur [ug/m2]
   app.rate.air <- app.rate.sur/1E6                               # app.rate.air [ug/m3]
   # above sets init air to same # of ug/m3 as surf conc is in g/m2
@@ -390,7 +390,7 @@ get.fug.concs = function(sdata,chem.data,x,cfug) {
 #'
 #' @export
 
-get.y0.concs = function(sdata,chem.data,pdmff,cfug) {
+get.y0.concs = function(sdata,chem.y0,pdmff,cfug) {
   z.air       <- 1/(8.314*pdmff$temp)                       # z.air [mol/(Pa m3)]
   sm.kp       <- 1.662E-12 * cfug$kow * pdmff$sm.carb.f * cfug$solub / (cfug$vapor * z.air)
   lg.kp       <- 1.662E-12 * cfug$kow * pdmff$lg.carb.f * cfug$solub / (cfug$vapor * z.air)
@@ -398,8 +398,8 @@ get.y0.concs = function(sdata,chem.data,pdmff,cfug) {
   # kp [m3/ug], 1.662E-12 [m3/ug], kow [-], carb.f [-], solub [mol/m3], vapor [Pa], z.air [mol/(Pa m3)]
   qstar <- pdmff$aer.out/24 * vol.air * (1 + sm.kp*pdmff$sm.load.air + lg.kp*pdmff$lg.load.air)
   # qstar is Q* in [m3/h], /24 converts aer from [1/day] to [1/hr], vol.air in [m3]
-  y           <- chem.data$y0 / (1 + qstar/(cfug$h.y0*sdata$f.area*pdmff$area.sur))
-  # y is average gas-phase concentration in house in [ug/m3]
+  y           <- chem.y0 / (1 + qstar/(cfug$h.y0*sdata$f.area*pdmff$area.sur))
+  # y is average gas-phase .data$concentration in house in [ug/m3]
   ug.mol      <- 1E6*cfug$molwt                             # ug.mol [ug/mol]
 
   zvb.air     <- z.air * vol.air * ug.mol                   # zvb.air [ug/Pa]

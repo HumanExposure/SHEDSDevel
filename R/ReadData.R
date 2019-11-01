@@ -1,7 +1,7 @@
 #' read.run.file
 #'
 #' Each SHEDS run has its own "run.file" that the user prepares before the run.   This file contains all the settings and file references needed for the run.  Read.run.file occurs at the start of each SHEDS run.  The contents of the run.file are examined, and stored in the R object "specs".
-#' 
+#'
 #' @export
 
 read.run.file = function(run.file="run_test.txt") {
@@ -154,13 +154,13 @@ read.run.file = function(run.file="run_test.txt") {
 
 
 #' read.act.diaries
-#' 
-#' Read.act.diaries reads human activity diaries from the .csv file indicated by "filename".  "Specs" contains the run specifications from the run.file, and is used to subset the activity diaries by age, gender, or season, if requested.  
-#' 
+#'
+#' Read.act.diaries reads human activity diaries from the .csv file indicated by "filename".  "Specs" contains the run specifications from the run.file, and is used to subset the activity diaries by age, gender, or season, if requested.
+#'
 #' @export
 read.act.diaries = function(filename,specs) {
   # Read activity diaries file
-  dt <- as.data.table(fread(paste0("inputs/",filename),colClasses = ("gender"="character")))
+  dt <- fread(paste0("inputs/",filename),colClasses = ("gender"="character"))
   if (nrow(dt)==0) stop("No data on diaries file \n")
   setnames(dt,names(dt),tolower(names(dt)))
   cols <- names(dt)[-which(names(dt) %in% c("chadid","gender","season","day.of.week"))]
@@ -186,21 +186,19 @@ read.act.diaries = function(filename,specs) {
 
 
 #' read.chem.props
-#' 
+#'
 #' Read.chem.props reads the chemical properties from the .csv file indicated by "filename". "Specs" contains the run specifications from the run.file, and is used to subset the chemicals by the list provided on the run.file.  If no such list was given, then all chemicals are kept.
-#' 
+#'
 #' @export
 read.chem.props = function(filename,specs) {
   # Read chemical properties input file
-  dt <- as.data.table(fread(paste0("inputs/",filename),na.strings=c("",".",".",".","NA")))
+  dt <- fread(paste0("inputs/",filename),na.strings=c("",".",".",".","NA"))
   setnames(dt,names(dt),tolower(names(dt)))
-  if(exists("chemical",dt)) setnames(dt,"chemical","cas")
-  mode(dt$cas) <- "character"
   mode(dt$kp) <- "numeric"
   dt$cas <- trimzero(str_replace_all(dt$cas,"-","_"))
   dt$cas <- ifelse(substr(dt$cas,1,1)=="_",paste0("0",dt$cas),dt$cas)
-  if(specs$n.chem>0) dt <- dt[dt$cas %in% specs$chem.list]
-  dt <- unique(dt,by="cas",fromLast=TRUE)
+  if(specs$n.chem>0) dt <- dt[dt$dtxsid %in% specs$chem.list]
+  dt <- unique(dt,by="dtxsid",fromLast=TRUE)
   if(nrow(dt)==0) cat("\n No chemicals left to model in source_chemicals \n")
   if(exists("name",dt))             setnames(dt,"name","chem.name")
   if(exists("vp.pa",dt))            setnames(dt,"vp.pa","vapor")
@@ -214,13 +212,13 @@ read.chem.props = function(filename,specs) {
 
 
 #' read.diet.diaries
-#' 
+#'
 #' Read.diet.diaries reads the food diaries from the .csv file indicated by "filename". "Specs" contains the run specifications from the run.file, and is used to subset the activity diaries by age and/or gender.
-#' 
+#'
 #' @export
 read.diet.diaries = function(filename,specs) {
   # Read diet diary consumption input file
-  dt <- as.data.table(fread(paste0("inputs/",filename),header=TRUE))
+  dt <- fread(paste0("inputs/",filename),header=TRUE)
   # setnames(dt,5:ncol(dt),toupper(names(dt)[5:ncol(dt)]))
   setnames(dt,names(dt),tolower(names(dt)))
   min.age     <- specs$min.age-round(specs$min.age*specs$age.match.pct/100)
@@ -238,28 +236,23 @@ read.diet.diaries = function(filename,specs) {
 
 
 #' read.exp.factors
-#' 
-#' Read.exp.factors reads the exposure factors from the .csv file indicated by "filename".  
-#' 
+#'
+#' Read.exp.factors reads the exposure factors from the .csv file indicated by "filename".
+#'
 #' @export
 read.exp.factors = function(filename) {
   # Read exposure factors input file
-  df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
-  names(df) <- tolower(names(df))
-  df <- df[!is.na(df$varname),]
-  if (nrow(df)==0) stop ("No data on exposure factors file \n")
-  df <- transform(df, form = tolower(gsub(" ", "", form)))
-  mode(df$min.age) <- "numeric"
-  mode(df$max.age) <- "numeric"
-  df$min.age[is.na(df$min.age)] <- 0
-  df$max.age[is.na(df$max.age)] <- 99
-  mode(df$gender) <- "character"
-  mode(df$season) <- "character"
-  mode(df$media)  <- "character"
-  df$gender <- toupper(as.character(df$gender))
-  df$season <- toupper(as.character(df$season))
-  df$media  <- tolower(as.character(df$media))
-  dt <- as.data.table(df)
+  dt <-fread(paste0("inputs/",filename),na.strings=".")
+  if (nrow(dt)==0) stop ("No data on exposure factors file \n")
+  dt <- transform(dt, form = tolower(gsub(" ", "", form)))
+  dt$min.age[is.na(dt$min.age)] <- 0
+  dt$max.age[is.na(dt$max.age)] <- 99
+  mode(dt$gender) <- "character"
+  mode(dt$season) <- "character"
+  mode(dt$media)  <- "character"
+  dt$gender <- toupper(as.character(dt$gender))
+  dt$season <- toupper(as.character(dt$season))
+  dt$media  <- tolower(as.character(dt$media))
   setkey(dt, varname)
   dt$row <- 1:nrow(dt)
   cat("\n Reading Exposure Factors completed")
@@ -268,25 +261,25 @@ read.exp.factors = function(filename) {
 
 
 #' read.fug.inputs
-#' 
-#' Read.fug.inputs reads the non-chemical dependent inputs for fugacity modeling in SHEDS from the .csv file indicated by "filename".   
-#' 
+#'
+#' Read.fug.inputs reads the non-chemical dependent inputs for fugacity modeling in SHEDS from the .csv file indicated by "filename".
+#'
 #' @export
 read.fug.inputs = function(filename) {
   # Read fugacity input file
-  df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
-  names(df) <- tolower(names(df))
-  if (nrow(df)==0) stop ("No data on fugacity input file \n")
+  #df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
+  #names(df) <- tolower(names(df))
+  dt <- fread(paste0("inputs/",filename),na.strings=".")
+  if (nrow(dt)==0) stop ("No data on fugacity input file \n")
   options(warn=-1)
-  mode(df$par1) <- "numeric"
-  mode(df$par2) <- "numeric"
-  mode(df$par3) <- "numeric"
-  mode(df$par4) <- "numeric"
-  mode(df$lower.trun) <- "numeric"
-  mode(df$upper.trun) <- "numeric"
+  mode(dt$par1) <- "numeric"
+  mode(dt$par2) <- "numeric"
+  mode(dt$par3) <- "numeric"
+  mode(dt$par4) <- "numeric"
+  mode(dt$lower.trun) <- "numeric"
+  mode(dt$upper.trun) <- "numeric"
   options(warn=0)
-  df <- transform(df, form = tolower(gsub(" ", "", form)))
-  dt <- as.data.table(df)
+  dt <- transform(dt, form = tolower(gsub(" ", "", form)))
   dt$varname <- tolower(dt$varname)
   # cat("\n Reading Fugacity Variables completed")
   return(dt)
@@ -294,13 +287,13 @@ read.fug.inputs = function(filename) {
 
 
 #' read.media.file
-#' 
+#'
 #' Read.media.file reads the names, properties, and associated microenvironments for each of the potential exposure media in SHEDS.
-#' 
+#'
 #' @export
 read.media.file = function(filename) {
   # Read media input file
-  dt <- as.data.table(read.csv(paste0("inputs/",filename),as.is=TRUE))
+  dt <- fread(paste0("inputs/",filename))
   setnames(dt,tolower(names(dt)))
   mode(dt$contact.p) <- "numeric"
   dt <- dt[dt$contact.p>0]
@@ -316,16 +309,16 @@ read.media.file = function(filename) {
 
 
 #' read.phys.file
-#' 
+#'
 #' Read.phys.file reads the physiology data from the .csv file indicated by "filename".
-#' 
+#'
 #' @export
 read.phys.file = function(filename) {
   # Read physiology input file
-  df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
-  names(df) <- tolower(names(df))
-  mode(df$age) <- "numeric"
-  dt <- as.data.table(df[!is.na(df$age),])
+  dt <- fread(paste0("inputs/",filename),na.strings=".")
+  setnames(dt,tolower(names(dt)))
+  mode(dt$age) <- "numeric"
+  dt <- dt[!is.na(dt$age)]
   if (nrow(dt)==0) stop("No data on physiology file \n")
   setkeyv(dt, c("gender","age"))
   cat("\n Reading Physiology File completed")
@@ -334,15 +327,15 @@ read.phys.file = function(filename) {
 
 
 #' read.pop.file
-#' 
-#' Read.pop.file reads the population data from the .csv file indicated by "filename".  
-#' 
+#'
+#' Read.pop.file reads the population data from the .csv file indicated by "filename".
+#'
 #' @export
 read.pop.file = function(filename,specs) {
   # Read population input file
-  df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
-  names(df) <- tolower(names(df))
-  pop <- as.data.table(df[!is.na(df$age),])
+  dt <- fread(paste0("inputs/",filename))
+  setnames(dt,tolower(names(dt)))
+  pop <- dt[!is.na(dt$age)]
   if (nrow(pop)==0) stop("No data on population input file \n")
   if (!"M" %in% specs$gender) pop$males   <- 0L
   if (!"F" %in% specs$gender) pop$females <- 0L
@@ -355,44 +348,41 @@ read.pop.file = function(filename,specs) {
 }
 
 #' read.source.scen.file
-#' 
-#' Read.source.scen.file reads the list of active exposure scenarios for each potential source of chemical from the .csv file indicated by "filename".  
-#' 
+#'
+#' Read.source.scen.file reads the list of active exposure scenarios for each potential source of chemical from the .csv file indicated by "filename".
+#'
 #' @export
 read.source.scen.file = function(filename) {
   # Read variables from srcScen input file
   fail <- FALSE
-  df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
-  if (nrow(df)==0) stop ("No data on source_scenarios file \n")
-  names(df)   <- tolower(str_trim(str_replace_all(names(df),","," ")))
-  names(df)[substr(names(df),1,9)=="source.id"]  <- "src"
-  names(df)[substr(names(df),1,8)=="food.res"]  <- "dietary"
-  names(df)[substr(names(df),1,8)=="food.mig"]  <- "migration"
-  names(df)[substr(names(df),1,21)=="product.direct.dermal"]  <- "dirderm"
-  names(df)[substr(names(df),1,21)=="product.direct.ingest"]  <- "diringest"
-  names(df)[substr(names(df),1,28)=="product.direct.inhalationaer"]  <- "dirinhaer"
-  names(df)[substr(names(df),1,28)=="product.direct.inhalationvap"]  <- "dirinhvap"
-  names(df)[substr(names(df),1,20)=="product.downthedrain"]  <- "downthedrain"
-  names(df)[substr(names(df),1,16)=="product.indirect"]  <- "indir.fug"
-  names(df)[substr(names(df),1,16)=="article.emission"]  <- "indir.y0"
-  if(!exists("src",df))     {fail=TRUE; cat("\n No sources on srcScen file")}
+  dt <- fread(paste0("inputs/",filename))
+  if (nrow(dt)==0) stop ("No data on source_scenarios file \n")
+  names(dt)   <- tolower(str_trim(str_replace_all(names(dt),","," ")))
+  names(dt)[substr(names(dt),1,8)=="food.res"]  <- "dietary"
+  names(dt)[substr(names(dt),1,8)=="food.mig"]  <- "migration"
+  names(dt)[substr(names(dt),1,21)=="product.direct.dermal"]  <- "dirderm"
+  names(dt)[substr(names(dt),1,21)=="product.direct.ingest"]  <- "diringest"
+  names(dt)[substr(names(dt),1,28)=="product.direct.inhalationaer"]  <- "dirinhaer"
+  names(dt)[substr(names(dt),1,28)=="product.direct.inhalationvap"]  <- "dirinhvap"
+  names(dt)[substr(names(dt),1,20)=="product.downthedrain"]  <- "downthedrain"
+  names(dt)[substr(names(dt),1,16)=="product.indirect"]  <- "indir.fug"
+  names(dt)[substr(names(dt),1,16)=="article.emission"]  <- "indir.y0"
+  dt$source.type <- tolower(dt$source.type)
+  if(!exists("pucid",dt))     {fail=TRUE; cat("\n No sources on srcScen file")}
   if(fail==TRUE) stop("\n Missing scenarios on source.scenarios file \n")
-  df$src <- tolower(str_trim(str_replace_all(df$src,","," ")))
-  df$source.type <- tolower(df$source.type)
-  if(length(unique(df$src))!=nrow(df)) stop("\n Duplicate source.ID found")
-  df <- check.src.scen.flags(df)
-  df <- check.src.scen.types(df)
-  dt <- as.data.table(df)
+  dt <- check.src.scen.flags(dt)
+  dt <- check.src.scen.types(dt)
   dt$nscen <- dt$dietary + dt$dirderm + dt$diringest + dt$dirinhaer +
     dt$dirinhvap + dt$downthedrain + dt$indir.fug + dt$indir.y0 + dt$migration
-  return(dt[dt$nscen>0])
+  dt <- dt[dt$nscen>0]
+  return(dt)
 }
 
 
 #' check.src.scen.flags
-#' 
+#'
 #' This function checks whether the settings on the source.scen object (input as "df") are set to numeric values of 1 or 0.  If the column for a particular exposure scenario is missing from "df", it is created and assigned "0" for all sources.
-#' 
+#'
 #' @export
 check.src.scen.flags = function(df) {
   fail <- FALSE
@@ -490,9 +480,9 @@ check.src.scen.flags = function(df) {
 
 
 #' Check.src.scen.types
-#' 
+#'
 #' This function checks whether the settings on the source.scen object (input as "df") are consistent with the source.type for each source.
-#' 
+#'
 #' @export
 check.src.scen.types = function(df) {
   if(any(df$dietary[!df$source.type=="food"]==1 )) {
@@ -502,6 +492,9 @@ check.src.scen.types = function(df) {
   if(any(df$migration[!df$source.type=="food"]==1 )) {
     df$migration[!df$source.type=="food"] <- 0
     cat("\n Non-food types flagged for food.migration scenario \n")
+  }
+  if(nrow(df[df$dietary==1 & df$migration==1])>0) {
+    cat("Dietary and migration pathways require separate formulations")
   }
   if(any(df$dirderm[!df$source.type=="product"]==1)) {
     df$dirderm[!df$source.type=="product"] <- 0
@@ -544,100 +537,71 @@ check.src.scen.types = function(df) {
 
 
 #' read.source.chem.file
-#' 
-#' Read.source.chem.file reads the distributions that are specific to combinations of source and chemical from the indicated .csv file. 
-#' 
+#'
+#' Read.source.chem.file reads the distributions that are specific to combinations of source and chemical from the indicated .csv file.
+#'
 #' @export
-read.source.chem.file = function(filename,scenSrc,specs) {
+read.source.chem.file = function(filename,source.scen,specs) {
   # Read variables from srcChem input file
   fail <- FALSE
-  df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
-  test2<<-df
-  if (nrow(df)==0) stop ("No data on source.chemicals file \n")
-  names(df)   <- tolower(str_trim(str_replace_all(names(df),","," ")))
-  names(df)[substr(names(df),1,9)=="source.id"]  <- "src"
-  names(df)[substr(names(df),1,9)=="source.de"]  <- "description"
-  names(df)[substr(names(df),1,3)=="cas"]  <- "cas"
-  names(df)[substr(names(df),1,3)=="che"]  <- "cas"
-  names(df)[substr(names(df),1,3)=="var"]  <- "varname"
-  names(df)[substr(names(df),1,3)=="des"]  <- "description"
-  names(df)[substr(names(df),1,3)=="uni"]  <- "units"
-  names(df)[substr(names(df),1,3)=="gen"]  <- "gender"
-  names(df)[substr(names(df),1,3)=="min"]  <- "min.age"
-  names(df)[substr(names(df),1,3)=="max"]  <- "max.age"
-  names(df)[substr(names(df),1,3)=="low"]  <- "lower.trun"
-  names(df)[substr(names(df),1,3)=="upp"]  <- "upper.trun"
-  names(df)[substr(names(df),1,3)=="for"]  <- "form"
-  names(df)[substr(names(df),1,3)=="mea"]  <- "mean"
-  names(df)[substr(names(df),1,3)=="val"]  <- "values"
-  names(df)[substr(names(df),1,2)=="cv"]   <- "cv"
-  if(length(names(df))>length(unique(names(df)))) {
+  dt <- fread(paste0("inputs/",filename),na.strings=".")
+  setnames(dt,tolower(str_trim(str_replace_all(names(dt),","," "))))
+  dt$source.type <- tolower(dt$source.type)
+  test2<<-dt
+  if (nrow(dt)==0) stop ("No data on source.chemicals file \n")
+  names(dt)[substr(names(dt),1,9)=="source.de"]  <- "description"
+  names(dt)[substr(names(dt),1,3)=="che"]  <- "dtxsid"
+  names(dt)[substr(names(dt),1,3)=="dtx"]  <- "dtxsid"
+  names(dt)[substr(names(dt),1,5)=="formu"]<- "form"
+  names(dt)[substr(names(dt),1,3)=="des"]  <- "description"
+  names(dt)[substr(names(dt),1,3)=="gen"]  <- "gender"
+  names(dt)[substr(names(dt),1,4)=="mina"] <- "min.age"
+  names(dt)[substr(names(dt),1,4)=="maxa"] <- "max.age"
+  names(dt)[substr(names(dt),1,4)=="prob"] <- "pr.chem"
+  names(dt)[substr(names(dt),1,4)=="prev"] <- "pr.chem"
+  names(dt)[substr(names(dt),1,4)=="l.tr"] <- "lower.trun"
+  names(dt)[substr(names(dt),1,4)=="u.tr"] <- "upper.trun"
+  if(length(names(dt))>length(unique(names(dt)))) {
     fail <- TRUE
     cat("\n Duplicate variable names on sources file")
   }
-  if(!exists("src",df))     {fail<-TRUE; cat("\n No source.ID on src.chem file")}
-  if(!exists("cas",df))     {fail<=TRUE; cat("\n No cas numbers on src.chem file")}
-  if(!exists("varname",df)) {fail<-TRUE; cat("\n No varname on src.chem file")}
-  if(!exists("form",df))    {fail<-TRUE; cat("\n No form on src.chem file")}
-  df$form <- tolower(str_trim(str_replace_all(df$form,","," ")))
-  if(any(df$form=="empirical") && !exists("values",df)) {
-    fail <- TRUE
-    cat("\n Values not given with empirical distribution")
+  if(!exists("pucid",dt))     {fail<-TRUE; cat("\n No pucid on src.chem file")}
+  if(!exists("dtxsid",dt))    {fail<=TRUE; cat("\n No DTXSID numbers on src.chem file")}
+  if(!exists("dist.type",dt)) {fail<-TRUE; cat("\n No dist.type on src.chem file")}
+  if(!exists("gender",dt))      dt$gender      <- ""
+  if(!exists("min.age",dt))     dt$min.age     <- 0
+  if(!exists("max.age",dt))     dt$max.age     <- 99
+  if(!exists("pr.chem",dt))     dt$pr.chem     <- 1
+  if(!exists("resamp",dt))      dt$resamp      <- "Y"
+  if(!exists("variable",dt))    dt$variable    <- ""
+  dt$gender   <- toupper(str_trim(str_replace_all(dt$gender,","," ")))
+  mode(dt$min.age) <- "numeric"
+  mode(dt$max.age) <- "numeric"
+  mode(dt$par3)    <- "numeric"
+  mode(dt$par4)    <- "numeric"
+  mode(dt$resamp)  <- "character"
+  dt$min.age[is.na(dt$min.age)] <- 0
+  dt$max.age[is.na(dt$max.age)] <- 99
+  if(any(dt$min.age<0)) {fail<-TRUE; cat("\n Negative age on sources file") }
+  dt$max.age[dt$max.age>99]     <- 99
+  dt$gender[dt$gender=="W"] <- "F"
+  dt$gender[dt$gender=="B"] <- ""
+  dt$gender[dt$gender==" "] <- ""
+  dt <- dt[!is.na(dt$dtxsid)]
+  if(any(source.scen$source.type=="food")){
+    ss <-source.scen[source.type=="food"]
+    for(i in 1:nrow(ss)){
+      src <- ss[i]$pucid
+      frm <- ss[i]$form
+      if(ss[i]$dietary==1)   typ <- "residue"
+      if(ss[i]$migration==1) typ <- "migration"
+      dt <- dt[!(dt$pucid==src & dt$form==frm & dt$variable!=typ)]
+    }
   }
-  if(any(df$form!="empirical") && (!exists("mean",df) | !exists("cv",df))) {
-    fail <- TRUE
-    cat("\n Mean and CV not given with non-empirical distribution")
-  }
-  if(!exists("description",df)) df$description <- ""
-  if(!exists("units",df))       df$units       <- ""
-  if(!exists("gender",df))      df$gender      <- ""
-  if(!exists("min.age",df))     df$min.age     <- 0
-  if(!exists("max.age",df))     df$max.age     <- 99
-  if(!exists("lower.trun",df))  df$lower.trun  <- 0
-  if(!exists("upper.trun",df))  df$upper.trun  <- 1E6
-  if(!exists("mean",df))        df$mean        <- 0
-  if(!exists("cv",df))          df$cv          <- 0
-  if(!exists("values",df))      df$values      <- ""
-  df$src      <- tolower(str_trim(str_replace_all(df$src,","," ")))
-  df$cas      <- tolower(str_trim(str_replace_all(df$cas,","," ")))
-  df$varname  <- tolower(str_trim(str_replace_all(df$varname,","," ")))
-  df$descrip  <- tolower(str_trim(str_replace_all(df$description,","," ")))
-  df$units    <- tolower(str_trim(str_replace_all(df$units,","," ")))
-  df$gender   <- toupper(str_trim(str_replace_all(df$gender,","," ")))
-  mode(df$min.age) <- "numeric"
-  mode(df$max.age) <- "numeric"
-  df$min.age[is.na(df$min.age)] <- 0
-  df$max.age[is.na(df$max.age)] <- 99
-  if(any(df$min.age<0)) {fail<-TRUE; cat("\n Negative age on sources file") }
-  df$max.age[df$max.age>99]     <- 99
-  df$gender[df$gender=="W"] <- "F"
-  df$gender[df$gender=="B"] <- ""
-  df$gender[df$gender==" "] <- ""
-  df <- df[!is.na(df$cas),]
-  df$cas <- trimzero(str_replace_all(df$cas,"-","_"))
-  if(mode(df$mean)!="numeric") {
-    df$mean <- tolower(str_trim(str_replace_all(df$mean,","," ")))
-    df$mean[df$mean=="." | df$mean==""] <- -1
-    mode(df$mean) <- "numeric"
-    df$mean[df$mean<0] <- NA
-  }
-  if(mode(df$cv)!="numeric") {
-    df$cv <- tolower(str_trim(str_replace_all(df$cv,","," ")))
-    df$cv[df$cv=="." | df$cv==""] <- -1
-    mode(df$cv) <- "numeric"
-    df$cv[df$cv<0] <- NA
-  }
-  if(any(df$mean<0,na.rm=TRUE)) {fail<-TRUE; cat("\n Negative mean on srcChem file")}
-  if(any(df$cv<0,na.rm=TRUE))   {fail<-TRUE; cat("\n Negative cv on srcChem file") }
-  dt  <- as.data.table(df)
-  if (specs$n.chem>0) { dt <- dt[dt$cas %in% specs$chem.list]
-  } else {dt <- dt[dt$cas %in% chem.props$cas]}
-  chem.list  <- sort(unique(dt$cas))
-  dt <- dt[dt$src %in% scenSrc]
-  dt[substr(dt$varname,1,2)=="f."]$upper.trun <- 1
-  dt$form[dt$form=='lognormal' & is.na(dt$cv)] <- 'point'
-  dt$form[dt$form=='normal' & dt$cv>0.5] <- 'lognormal'
-  dt$values[dt$form=='empirical' & is.na(dt$values)] <- "1"
+  if (specs$n.chem>0) { dt <- dt[dt$dtxsid %in% specs$chem.list]
+  } else {dt <- dt[dt$dtxsid %in% chem.props$dtxsid]}
+  chem.list  <- sort(unique(dt$dtxsid))
+  dt <- dt[dt$pucid %in% pucid]
   if (fail==TRUE) stop()
   cat("\n Reading Source.chemicals file completed")
   return(dt)
@@ -645,12 +609,12 @@ read.source.chem.file = function(filename,scenSrc,specs) {
 
 
 #' update.specs
-#' 
+#'
 #' "Specs" is the list of run settings read from the run.file.  "Dt" is a data table of source-chemical combinations for which distributions have been specified.  "Specs" contains a list of chemicals to be processed in the SHEDS run, and if any of these chemicals are missing from the "dt" table, then update.specs removes them from the list.  Otherwise, "specs" is not altered.
-#' 
+#'
 #' @export
 update.specs = function(specs,dt) {
-  specs$chem.list <- sort(unique(dt$cas))
+  specs$chem.list <- sort(unique(dt$dtxsid))
   specs$n.chem    <- length(specs$chem.list)
   if (specs$n.chem==0) {cat ("\n No chemicals remaining to model \n"); stop() }
   return(specs)
@@ -658,97 +622,77 @@ update.specs = function(specs,dt) {
 
 
 #' read.source.vars.file
-#' 
-#' Read.source.vars.file reads the distributions that are specific to combinations of source and chemical from the indicated .csv file.  
-#' 
+#'
+#' Read.source.vars.file reads the distributions that are specific to combinations of source and chemical from the indicated .csv file.
+#'
 #' @export
 read.source.vars.file = function(filename,src.scen) {
   # Read variables from source.variables input file
   fail <- FALSE
-  df <- read.csv(paste0("inputs/",filename),as.is=TRUE)
-  if (nrow(df)==0) stop ("No data on source.variables file \n")
-  names(df)   <- tolower(str_trim(str_replace_all(names(df),","," ")))
-  names(df)[substr(names(df),1,9)=="source.id"]  <- "src"
-  names(df)[substr(names(df),1,9)=="source.de"]  <- "src.description"
-  names(df)[substr(names(df),1,8)=="variable"]   <- "varname"
-  names(df)[substr(names(df),1,8)=="var.desc"]   <- "var.description"
-  names(df)[substr(names(df),1,3)=="uni"]  <- "units"
-  names(df)[substr(names(df),1,3)=="gen"]  <- "gender"
-  names(df)[substr(names(df),1,3)=="min"]  <- "min.age"
-  names(df)[substr(names(df),1,3)=="max"]  <- "max.age"
-  names(df)[substr(names(df),1,3)=="low"]  <- "lower.trun"
-  names(df)[substr(names(df),1,3)=="upp"]  <- "upper.trun"
-  names(df)[substr(names(df),1,3)=="res"]  <- "resamp"
-  names(df)[substr(names(df),1,3)=="pro"]  <- "probs"
-  names(df)[substr(names(df),1,3)=="val"]  <- "values"
-  names(df)[substr(names(df),1,3)=="for"]  <- "form"
-  names(df)[substr(names(df),1,3)=="mea"]  <- "mean"
-  names(df)[substr(names(df),1,2)=="cv"]   <- "cv"
-  if(length(names(df))>length(unique(names(df)))) {
+  dt <- fread(paste0("inputs/",filename))
+  if (nrow(dt)==0) stop ("No data on source.variables file \n")
+  names(dt)   <- tolower(str_trim(str_replace_all(names(dt),","," ")))
+  names(dt)[substr(names(dt),1,3)=="gen"]  <- "gender"
+  names(dt)[substr(names(dt),1,3)=="min"]  <- "min.age"
+  names(dt)[substr(names(dt),1,3)=="max"]  <- "max.age"
+  names(dt)[substr(names(dt),1,4)=="vari"] <- "varname"
+  names(dt)[substr(names(dt),1,3)=="for"]  <- "dist.type"
+  names(dt)[substr(names(dt),1,3)=="typ"]  <- "dist.type"
+  names(dt)[substr(names(dt),1,4)=="l.tr"] <- "lower.trun"
+  names(dt)[substr(names(dt),1,4)=="u.tr"] <- "upper.trun"
+  if(length(names(dt))>length(unique(names(dt)))) {
     fail <- TRUE
     cat("\n Duplicate variable names on source.variables file")
   }
-  if(!exists("src",df))     {fail<-TRUE; cat("\n No source on src.vars file")}
-  if(!exists("varname",df)) {fail<-TRUE; cat("\n No varname on src.vars file")}
-  if(!exists("form",df))    {fail<-TRUE; cat("\n No form on src.vars file")}
-  df$form <- tolower(str_trim(str_replace_all(df$form,","," ")))
-  if(any(df$form=="empirical") && !exists("values",df)) {
+  dt$dist.type <- tolower(str_trim(str_replace_all(dt$dist.type,","," ")))
+  if(any(dt$dist.type=="empirical") && !exists("values",dt)) {
     fail <- TRUE
     cat("\n Values not given with empirical distribution")
   }
-  if(any(df$form!="empirical") && (!exists("mean",df) | !exists("cv",df))) {
+  if(any(dt$dist.type!="empirical") && (!exists("mean",dt) | !exists("cv",dt))) {
     fail <- TRUE
     cat("\n Mean and CV not given with non-empirical distribution")
   }
-  if(!exists("description",df)) df$description <- ""
-  if(!exists("units",df))       df$units       <- ""
-  if(!exists("gender",df))      df$gender      <- ""
-  if(!exists("min.age",df))     df$min.age     <- 0
-  if(!exists("max.age",df))     df$max.age     <- 99
-  if(!exists("lower.trun",df))  df$lower.trun  <- 0
-  if(!exists("upper.trun",df))  df$upper.trun  <- 1E6
-  if(!exists("mean",df))        df$mean        <- 0
-  if(!exists("cv",df))          df$cv          <- 0
-  if(!exists("values",df))      df$values      <- ""
-  if(!exists("probs",df))       df$probs       <- 0
-  if(!exists("resamp",df))      df$resamp      <- "y"
-  df$src      <- tolower(str_trim(str_replace_all(df$src,","," ")))
-  df$varname  <- tolower(str_trim(str_replace_all(df$varname,","," ")))
-  df$descrip  <- tolower(str_trim(str_replace_all(df$description,","," ")))
-  df$units    <- tolower(str_trim(str_replace_all(df$units,","," ")))
-  df$gender   <- toupper(str_trim(str_replace_all(df$gender,","," ")))
-  mode(df$min.age) <- "numeric"
-  mode(df$max.age) <- "numeric"
-  df$min.age[is.na(df$min.age)] <- 0
-  df$max.age[is.na(df$max.age)] <- 99
-  if(any(df$min.age<0)) {fail<-TRUE; cat("\n Negative age on srcVars file") }
-  df$max.age[df$max.age>99]     <- 99
-  df$gender[df$gender=="W"] <- "F"
-  df$gender[df$gender=="B"] <- ""
-  df$gender[df$gender==" "] <- ""
-  if(mode(df$mean)!="numeric") {
-    df$mean <- tolower(str_trim(str_replace_all(df$mean,","," ")))
-    df$mean[df$mean=="." | df$mean==""] <- -1
-    mode(df$mean) <- "numeric"
-    df$mean[df$mean<0] <- NA
+  if(!exists("gender",dt))      dt$gender      <- ""
+  if(!exists("min.age",dt))     dt$min.age     <- 0
+  if(!exists("max.age",dt))     dt$max.age     <- 99
+  if(!exists("mean",dt))        dt$mean        <- 0
+  if(!exists("cv",dt))          dt$cv          <- 0
+  if(!exists("values",dt))      dt$values      <- ""
+  if(!exists("resamp",dt))      dt$resamp      <- "Y"
+  dt$gender   <- toupper(str_trim(str_replace_all(dt$gender,","," ")))
+  mode(dt$min.age) <- "numeric"
+  mode(dt$max.age) <- "numeric"
+  mode(dt$resamp)  <- "character"
+  dt$min.age[is.na(dt$min.age)] <- 0
+  dt$max.age[is.na(dt$max.age)] <- 99
+  if(any(dt$min.age<0)) {fail<-TRUE; cat("\n Negative age on srcVars file") }
+  dt$max.age[dt$max.age>99] <- 99
+  dt$gender[dt$gender=="W"] <- "F"
+  dt$gender[dt$gender=="B"] <- ""
+  dt$gender[dt$gender==" "] <- ""
+  if(mode(dt$mean)!="numeric") {
+    dt$mean <- tolower(str_trim(str_replace_all(dt$mean,","," ")))
+    dt$mean[dt$mean=="." | dt$mean==""] <- -1
+    mode(dt$mean) <- "numeric"
+    dt$mean[dt$mean<0] <- NA
   }
-  if(mode(df$cv)!="numeric") {
-    df$cv <- tolower(str_trim(str_replace_all(df$cv,","," ")))
-    df$cv[df$cv=="." | df$cv==""] <- -1
-    mode(df$cv) <- "numeric"
-    df$cv[df$cv<0] <- NA
+  if(mode(dt$cv)!="numeric") {
+    dt$cv <- tolower(str_trim(str_replace_all(dt$cv,","," ")))
+    dt$cv[df$cv=="." | dt$cv==""] <- -1
+    mode(dt$cv) <- "numeric"
+    dt$cv[dt$cv<0] <- NA
   }
-  if(any(df$mean<0,na.rm=TRUE)) {fail<-TRUE; cat("\n Negative mean on srcVars file")}
-  if(any(df$cv<0,na.rm=TRUE))   {fail<-TRUE; cat("\n Negative cv on srcVars file") }
+  if(any(dt$mean<0,na.rm=TRUE)) {fail<-TRUE; cat("\n Negative mean on source_Vars file")}
+  if(any(dt$cv<0,na.rm=TRUE))   {fail<-TRUE; cat("\n Negative cv on source_vars file") }
 
-  dt <- as.data.table(df)
-  dt <- dt[dt$src %in% src.scen$src]
-  dt[substr(dt$varname,1,2)=="f."]$upper.trun <- 1
-  dt$form[dt$form=='lognormal' & is.na(dt$cv)] <- 'point'
-  dt$form[dt$form=='normal' & dt$cv>0.5] <- 'lognormal'
+  dt <- dt[dt$pucid %in% src.scen$pucid]
+  aer.line <- dt[dt$varname=="f.aerosol"][1]
+  dt$dist.type[dt$dist.type=='lognormal' & is.na(dt$cv)] <- 'point'
+  dt$dist.type[dt$dist.type=='normal' & dt$cv>0.5] <- 'lognormal'
   for (i in 1:nrow(src.scen)) {
     sc <- src.scen[i]
-    v1 <- dt[dt$src==sc$src]
+    v1 <- dt[dt$pucid==sc$pucid]
     if (any(substr(v1$varname,1,8)=="use.prev"))  u.prev<-TRUE else u.prev<-FALSE
     if (any(substr(v1$varname,1,8)=="use.freq"))  u.freq<-TRUE else u.freq<-FALSE
     if (any(substr(v1$varname,1,9)=="home.prev")) h.prev<-TRUE else h.prev<-FALSE
@@ -764,51 +708,55 @@ read.source.vars.file = function(filename,src.scen) {
     if (any(substr(v1$varname,1,5)=="f.aer"))     f.aer <-TRUE else f.aer <-FALSE
     if (any(substr(v1$varname,1,5)=="f.dra"))     f.dra <-TRUE else f.dra <-FALSE
     if (sc$dirderm==1) {
-      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$src)
-      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$src)
-      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$src)
-      if (f.con ==FALSE) cat ("\n F.contact missing for source ", sc$src)
-      if (f.res ==FALSE) cat ("\n F.residual missing for source ", sc$src)
+      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$pucid)
+      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$pucid)
+      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$pucid)
+      if (f.con ==FALSE) cat ("\n F.contact missing for source ", sc$pucid)
+      if (f.res ==FALSE) cat ("\n F.residual missing for source ", sc$pucid)
     }
     if (sc$diringest==1) {
-      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$src)
-      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$src)
-      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$src)
-      if (f.ing ==FALSE) cat ("\n F.ingested missing for source ", sc$src)
+      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$pucid)
+      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$pucid)
+      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$pucid)
+      if (f.ing ==FALSE) cat ("\n F.ingested missing for source ", sc$pucid)
     }
     if (sc$dirinhaer==1) {
-      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$src)
-      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$src)
-      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$src)
-      if (dur   ==FALSE) cat ("\n Duration missing for source ", sc$src)
-      if (vol   ==FALSE) cat ("\n Volume missing for source ", sc$src)
-      if (f.aer ==FALSE) cat ("\n F.aerosol missing for source ", sc$src)
+      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$pucid)
+      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$pucid)
+      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$pucid)
+      if (dur   ==FALSE) cat ("\n Duration missing for source ", sc$pucid)
+      if (vol   ==FALSE) cat ("\n Volume missing for source ", sc$pucid)
+      if (f.aer ==FALSE) cat ("\n F.aerosol missing for source ", sc$pucid)
+      aer.line$pucid <- sc$pucid
+      dt <- rbindlist(list(dt,aer.line))
+      setorder(dt,pucid,varname)
     }
     if (sc$dirinhvap==1) {
-      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$src)
-      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$src)
-      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$src)
-      if (dur   ==FALSE) cat ("\n Duration missing for source ", sc$src)
+      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$pucid)
+      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$pucid)
+      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$pucid)
+      if (dur   ==FALSE) cat ("\n Duration missing for source ", sc$pucid)
     }
     if (sc$downthedrain==1) {
-      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$src)
-      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$src)
-      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$src)
-      if (f.dra ==FALSE) cat ("\n F.drain missing for source ", sc$src)
+      if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$pucid)
+      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$pucid)
+      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$pucid)
+      if (f.dra ==FALSE) cat ("\n F.drain missing for source ", sc$pucid)
     }
     if (sc$indir.fug==1) {
       if (h.prev==FALSE & u.prev==FALSE)
-        cat ("\n Home.prev and use.prev missing for source", sc$src)
-      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$src)
-      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$src)
+        cat ("\n Home.prev and use.prev missing for source", sc$pucid)
+      if (u.freq==FALSE) cat ("\n Use.freq missing for source ", sc$pucid)
+      if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$pucid)
     }
     if (sc$indir.y0==1) {
       if (h.prev==FALSE & u.prev==FALSE)
-        cat ("\n Home.prev and use.prev missing for source ", sc$src)
-      if (f.area==FALSE) cat ("\n Area missing for source ", sc$src)
+        cat ("\n Home.prev and use.prev missing for source ", sc$pucid)
+      if (f.area==FALSE) cat ("\n Area missing for source ", sc$pucid)
     }
   }
   if (fail==TRUE) stop("\n Bad data on source.variables file \n")
+  dt <- unique(dt)
   cat("\n Reading Source.variables file completed")
   tester<<-dt
   return(dt)
@@ -816,9 +764,9 @@ read.source.vars.file = function(filename,src.scen) {
 
 
 #' check.foods
-#'  
+#'
 #' This function creates a list of unique food types.
-#' 
+#'
 #' @export
 check.foods = function(s) {
   t <- unique(s,fromLast=TRUE,by="varname")

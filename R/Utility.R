@@ -5,19 +5,19 @@
 #' @param shape Required with no default. The permited inputs are Bernoulli, binomial, beta, discrete, empirical,
 #' exponential, gamma, lognormal, normal, point, probability, triangle, uniform, and Weibull.
 #'
-#' @param par1 optional value requared for some shapes. Defulat = none
+#' @param par1 optional value requared for some shapes. Default = none
 #'
-#' @param par2 optional value requared for some shapes. Defulat = none
+#' @param par2 optional value requared for some shapes. Default = none
 #'
-#' @param par3 optional value requared for some shapes. Defulat = none
+#' @param par3 optional value requared for some shapes. Default = none
 #'
-#' @param par4 optional value requared for some shapes. Defulat = none
+#' @param par4 optional value requared for some shapes. Default = none
 #'
-#' @param It optional value requared for some shapes. Defulat = none
+#' @param It optional value requared for some shapes. Default = none
 #'
-#' @param Ut optional value requared for some shapes. Defulat = none
+#' @param Ut optional value requared for some shapes. Default = none
 #'
-#' @param resamp optional value requared for some shapes. Defulat = 'y'
+#' @param resamp optional value requared for some shapes. Default = 'y'
 #'
 #' @param n Optional	Default = 1
 #'
@@ -417,8 +417,8 @@ summarize.chemical = function(x,c,chem,chemical,set,sets,specs) {
     print(out)
   }
 
-  dir  <- paste0("output/",specs$run.name)
-  name <- paste0(dir,"/CAS_",chem,suffix,".csv")
+  dir  <- paste0("output/",specs$run.name,"/")
+  name <- paste0(dir,chem,suffix,".csv")
 
   write.csv(rbind(a,Statistic),name)
 }
@@ -612,8 +612,8 @@ vpos = function(v,list) {
 #' @export
 
 write.persons = function(x,chem,set,specs) {
-  dir    <- paste0("output/",specs$run.name)
-  name   <- paste0(dir,"/CAS_",chem,"_all.csv")
+  dir    <- paste0("output/",specs$run.name,"/")
+  name   <- paste0(dir,chem,"_all.csv")
   person <- x$person + (set-1)*specs$set.size
   a      <- as.data.table(cbind(person,as.character(x$gender),x$age,
                            as.character(x$season), x$weekend, round(x$weight,3),

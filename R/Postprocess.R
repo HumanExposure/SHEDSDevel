@@ -123,7 +123,7 @@ filter_sources = function(in.file="source_scen_prods.csv",out.file="source_scen_
   }
   if (ids[1] !="ALL")  {
     ids    <- trimws(tolower(ids))
-    sids   <- trimws(tolower(sources$source.id))
+    sids   <- trimws(tolower(sources$pucid))
     sources<-sources[sids %in% ids,]
   }
   write.csv(sources, paste0("inputs/",out.file), row.names=FALSE)
