@@ -57,7 +57,7 @@ distrib = function(shape="",par1=NA,par2=NA,par3=NA,par4=NA,lt=NA,
   # the number of samples, but then quantiles are randomly generated first.
   # Written by Graham Glen, Alion Science and Technology, July 2012.
   # Last modified by GG (ICF International) on August 28, 2016.
-
+  
   m <- ""
   n <- round(n)
   if (n<=0) m <- paste("# samples requested = ",n)
@@ -67,11 +67,12 @@ distrib = function(shape="",par1=NA,par2=NA,par3=NA,par4=NA,lt=NA,
   if (is.na(q[1])) q <- runif(n)
   s <- strtrim(tolower(shape),4)
   r <- strtrim(tolower(resamp),1)
+  if (is.na(resamp))       r <- "y"
   if (is.na(lt)&is.na(ut)) r <- "n"
   if (!is.na(ut)&!is.na(lt)&ut<lt) m <- paste("Truncation limits",lt,"and",ut)
   if (!is.numeric(q)) m <- "Quantiles are not numeric"
   if (min(q)<0 || max(q)>1) m <- "Quantiles not all between 0 and 1"
-
+  
   if (m!="") {
   } else if (s=="bern" || s=="bino") {
     if (is.na(par1)) par1 <- 0.5
@@ -224,14 +225,14 @@ distrib = function(shape="",par1=NA,par2=NA,par3=NA,par4=NA,lt=NA,
     if (r=='y') {
       if (!is.na(lt) && lt>par1 && lt<=par2) {
         if (lt==par3) { qlo <- p
-          } else if (lt<par3) { qlo <-   (lt-par1)^2/((par2-par1)*(par3-par1))
-          } else if (lt>par3) { qlo <- 1-(par2-lt)^2/((par2-par1)*(par2-par3))
+        } else if (lt<par3) { qlo <-   (lt-par1)^2/((par2-par1)*(par3-par1))
+        } else if (lt>par3) { qlo <- 1-(par2-lt)^2/((par2-par1)*(par2-par3))
         }
       } else qlo <- 0
       if (!is.na(ut) && ut>=par1 && ut<par2) {
         if (ut==par3) {qhi <- p
-          } else if (ut<par3) { qhi <-   (ut-par1)^2/((par2-par1)*(par3-par1))
-          } else if (ut>par3) { qhi <- 1-(par2-ut)^2/((par2-par1)*(par2-par3))
+        } else if (ut<par3) { qhi <-   (ut-par1)^2/((par2-par1)*(par3-par1))
+        } else if (ut>par3) { qhi <- 1-(par2-ut)^2/((par2-par1)*(par2-par3))
         }
       } else qhi <- 1
       q <- qlo+q*(qhi-qlo)
@@ -271,7 +272,7 @@ distrib = function(shape="",par1=NA,par2=NA,par3=NA,par4=NA,lt=NA,
     }
     if (m=="") x <- par3+qweibull(q,par1,par2)
   } else m <- paste("Unknown Distrib shape ",s)
-
+  
   if (m != "") {cat("\nError in distrib: ",m,"\n"); return(NULL)
   } else {
     if (!is.na(lt)) x <- mapply(max,lt,x)
@@ -370,11 +371,11 @@ quantiles = function(x) {
 summarize.chemical = function(x,c,chem,chemical,set,sets,specs) {
   suffix <- paste0("_set",set,"stats")
   mode(x$age) <- "numeric"
- if (set=="allstats") { names(x) <- c("person","gender","age","season","weekend","weight",
-     "exp.dermal.tot","exp.inhal.tot","exp.ingest.tot","exp.diet","exp.nondiet","exp.ddd.tot",
-     "dose.inhal.tot","dose.intake.ug","dose.intake.mgkg","abs.dermal.ug","abs.inhal.ug",
-     "abs.ingest.ug","abs.tot.ug","abs.tot.mgkg","urine.tot.ug","exp.window","conc.inhal.max.prod.aer","conc.inhal.max.prod.vap","exp.inhal.indir","abs.hm.ug")
-     suffix <- "_allstats"
+  if (set=="allstats") { names(x) <- c("person","gender","age","season","weekend","weight",
+                                       "exp.dermal.tot","exp.inhal.tot","exp.ingest.tot","exp.diet","exp.nondiet","exp.ddd.tot",
+                                       "dose.inhal.tot","dose.intake.ug","dose.intake.mgkg","abs.dermal.ug","abs.inhal.ug",
+                                       "abs.ingest.ug","abs.tot.ug","abs.tot.mgkg","urine.tot.ug","exp.window","conc.inhal.max.prod.aer","conc.inhal.max.prod.vap","exp.inhal.indir","abs.hm.ug")
+  suffix <- "_allstats"
   }
   Statistic <- as.list(cbind("Cohort","ug/day","ug/day","ug/m3","ug/day","mg/kg/day","ug/day",
                              "ug/day","ug/day","ug/day","mg/kg/day","g/day","ug/m3","ug/m3","ug/m3","ug/day"))
@@ -396,7 +397,7 @@ summarize.chemical = function(x,c,chem,chemical,set,sets,specs) {
   if (nrow(y)>0) a <- rbind(a,cbind("Age_20_65",summary.stats(y)))
   y <- x[x$age>=66]
   if (nrow(y)>0) a <- rbind(a,cbind("Age_66+",summary.stats(y)))
-
+  
   if(specs$details!="0" & tolower(specs$details)!="no") {
     n1 <- nrow(b)-1
     stat  <- "pop.mean"
@@ -416,10 +417,10 @@ summarize.chemical = function(x,c,chem,chemical,set,sets,specs) {
     cat("\n set=",set,"/",sets," chem=",c,"/",specs$n.chem,"   ",chem,"  ",chemical,"\n")
     print(out)
   }
-
+  
   dir  <- paste0("output/",specs$run.name,"/")
   name <- paste0(dir,chem,suffix,".csv")
-
+  
   write.csv(rbind(a,Statistic),name)
 }
 
@@ -508,8 +509,8 @@ summary.stats = function(x) {
   abs.hm.ug[n1]      <- mean(y15,na.rm=TRUE)
   abs.hm.ug[n2]      <- sd(y15,na.rm=TRUE)
   return(cbind(exp.dermal,exp.ingest,exp.inhal,
-             dose.inhal,dose.intake,abs.dermal.ug,abs.ingest.ug,
-             abs.inhal.ug,abs.tot.ug,abs.tot.mgkg,ddd.mass,conc.max.prod.aer,conc.max.prod.vap,exp.inhal.indir,abs.hm.ug))
+               dose.inhal,dose.intake,abs.dermal.ug,abs.ingest.ug,
+               abs.inhal.ug,abs.tot.ug,abs.tot.mgkg,ddd.mass,conc.max.prod.aer,conc.max.prod.vap,exp.inhal.indir,abs.hm.ug))
 }
 
 #' Trimzero
@@ -565,21 +566,21 @@ unpack = function(filelist="") {
   }
   inlib <- paste0(getwd(),"/inputs")
   if (dir.exists(inlib)) {
-
-  for (i in 1:length(filelist)) {
-    infile  <- filelist[[i]]
-    extension <- ".csv"
-    if (tolower(substr(infile,1,3))=="run") extension <- ".txt"
-    if (tolower(substr(infile,1,3))=="rea") extension <- ".txt"
-    csvfile <- paste0(tolower(infile),extension)
-       name<-system.file("extdata", csvfile, package = "ShedsHT")
-       cat("\n Unpacking ",name)
-       file.copy(name, inlib,overwrite=T)
-       #ExportDataTables(infile,inlib,csvfile)
-  }
+    
+    for (i in 1:length(filelist)) {
+      infile  <- filelist[[i]]
+      extension <- ".csv"
+      if (tolower(substr(infile,1,3))=="run") extension <- ".txt"
+      if (tolower(substr(infile,1,3))=="rea") extension <- ".txt"
+      csvfile <- paste0(tolower(infile),extension)
+      name<-system.file("extdata", csvfile, package = "ShedsHT")
+      cat("\n Unpacking ",name)
+      file.copy(name, inlib,overwrite=T)
+      #ExportDataTables(infile,inlib,csvfile)
+    }
   }
   if (!dir.exists(inlib)) {
-  cat("\n The Inputs directory does not exist in the SHEDS home directory. Unpack failed.")
+    cat("\n The Inputs directory does not exist in the SHEDS home directory. Unpack failed.")
   }
 }
 #' vpos
@@ -594,7 +595,7 @@ unpack = function(filelist="") {
 
 vpos = function(v,list) {
   for (i in 1:length(list)) {
-     if (list[i]==v) return(i)
+    if (list[i]==v) return(i)
   }
   cat ("\n Variable ",v," not found in list \n")
   return(0)
@@ -616,17 +617,17 @@ write.persons = function(x,chem,set,specs) {
   name   <- paste0(dir,chem,"_all.csv")
   person <- x$person + (set-1)*specs$set.size
   a      <- as.data.table(cbind(person,as.character(x$gender),x$age,
-                           as.character(x$season), x$weekend, round(x$weight,3),
-                           round(x$exp.dermal.tot,6), round(x$exp.inhal.tot,6),
-                           round(x$exp.ingest.tot,6), round(x$exp.dietary.tot,6),
-                           round(x$exp.nondiet.tot,6), round(x$exp.ddd.tot,6),
-                           round(x$dose.inhal.tot,6), round(x$dose.intake.ug,6),
-                           round(x$dose.intake.mgkg,9), round(x$abs.dermal.ug,6),
-                           round(x$abs.inhal.ug,6), round(x$abs.ingest.ug,6),
-                           round(x$abs.tot.ug,6), round(x$abs.tot.mgkg,9),
-                           round(x$urine.tot.ug,6), round(x$exp.window.tot,6),
-                           round(x$conc.inhal.max.prod.aer,6),round(x$conc.inhal.max.prod.vap,6),round(x$exp.inhal.indir,6),
-                           round(x$abs.hm.ug,6)))
+                                as.character(x$season), x$weekend, round(x$weight,3),
+                                round(x$exp.dermal.tot,6), round(x$exp.inhal.tot,6),
+                                round(x$exp.ingest.tot,6), round(x$exp.dietary.tot,6),
+                                round(x$exp.nondiet.tot,6), round(x$exp.ddd.tot,6),
+                                round(x$dose.inhal.tot,6), round(x$dose.intake.ug,6),
+                                round(x$dose.intake.mgkg,9), round(x$abs.dermal.ug,6),
+                                round(x$abs.inhal.ug,6), round(x$abs.ingest.ug,6),
+                                round(x$abs.tot.ug,6), round(x$abs.tot.mgkg,9),
+                                round(x$urine.tot.ug,6), round(x$exp.window.tot,6),
+                                round(x$conc.inhal.max.prod.aer,6),round(x$conc.inhal.max.prod.vap,6),round(x$exp.inhal.indir,6),
+                                round(x$abs.hm.ug,6)))
   setnames(a,names(a),c("person","gender","age","season","weekend","weight",
                         "exp.dermal","exp.inhal","exp.ingest","exp.diet","exp.nondiet",
                         "exp.drain","dose.inhal.ug","dose.intake.ug","dose.intake.mgkg",

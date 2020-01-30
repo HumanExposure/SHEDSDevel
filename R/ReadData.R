@@ -5,7 +5,7 @@
 #' @export
 
 read.run.file = function(run.file="run_test.txt") {
-
+  
   if(exists("specs"))   rm(specs,inherits = TRUE)
   run.name         <- "prods"
   n.persons        <- 10
@@ -32,15 +32,15 @@ read.run.file = function(run.file="run_test.txt") {
   source.chem.file <- "Source_chem_prods.csv"
   chem.list        <- ""
   n.chem           <- 0
-
+  
   if (!grepl("[.]txt$", run.file) & !grepl("[.]csv$", run.file)) {
-     run.file = paste0(run.file,".txt") }
+    run.file = paste0(run.file,".txt") }
   a <- read.table(paste0("inputs/",run.file),skip=1,sep="=",
                   stringsAsFactors=FALSE,strip.white=TRUE)
   a$V1 <- tolower(a$V1)
   a$V2 <- gsub(" ","",a$V2)
-
-
+  
+  
   for (i in 1:nrow(a)) {
     if (str_trim(a$V1[i])=="run.name")         run.name         <- str_trim(a$V2[i])
     if (str_trim(a$V1[i])=="n.persons")        n.persons        <- as.integer(a$V2[i])
@@ -66,9 +66,9 @@ read.run.file = function(run.file="run_test.txt") {
     if (str_trim(a$V1[i])=="source.scen.file") source.scen.file <- str_trim(a$V2[i])
     if (str_trim(a$V1[i])=="source.chem.file") source.chem.file <- str_trim(a$V2[i])
     if (str_trim(a$V1[i])=="chemical") {
-        n.chem <- n.chem+1; chem.list[n.chem] <- str_trim(a$V2[i]) }
+      n.chem <- n.chem+1; chem.list[n.chem] <- str_trim(a$V2[i]) }
   }
-
+  
   dir  <- paste0("output/",run.name)
   if(!file.exists(dir)) dir.create(dir,recursive=TRUE)
   set.seed(run.seed)
@@ -96,7 +96,7 @@ read.run.file = function(run.file="run_test.txt") {
   if (is.null(genders))   stop("\n No genders selected \n")
   if (is.null(seasons))   stop("\n No seasons selected \n")
   if (max.age<min.age)      stop("\n Max age < min age   \n")
-
+  
   cat("\n")
   cat("run.name         =",run.name,"\n")
   cat("n.persons        =",n.persons,"\n")
@@ -122,7 +122,7 @@ read.run.file = function(run.file="run_test.txt") {
   cat("source.scen.file =",source.scen.file,"\n")
   cat("source.chem.file =",source.chem.file,"\n")
   cat("# chemicals      =",n.chem,"\n")
-
+  
   s <- list(
     run.name         = run.name,
     n.persons        = n.persons,
@@ -173,14 +173,14 @@ read.act.diaries = function(filename,specs) {
   mode(dt$age) <- "numeric"
   d <- dt[dt$age>=d.min.age & dt$age<=d.max.age & dt$season %in% specs$seasons
           & dt$gender %in% specs$genders]
-    setnames(d,"age","d.age")
+  setnames(d,"age","d.age")
   setnames(d,"gender","d.gender")
   setnames(d,"weekend","d.weekend")
   setnames(d,"season","d.season")
   setnames(d,"bath","bath.mins")
   d[,diary.id:=1:nrow(d)]
   setkey(d,diary.id)
-  cat("\n Reading Activity Diaries completed")
+  cat("\n Reading Activity Diaries completed\n")
   return(d)
 }
 
@@ -206,7 +206,7 @@ read.chem.props = function(filename,specs) {
   if(exists("log.kow",dt))          dt$kow     <- 10^dt$log.kow
   if(exists("half.sediment.hr",dt)) dt$decay.s <- 24*log(2)/dt$half.sediment.hr
   if(exists("half.air.hr",dt))      dt$decay.a <- 24*log(2)/dt$half.air.hr
-  cat("\n Reading Chemical Properties completed")
+  cat(" Reading Chemical Properties completed\n")
   return(dt)
 }
 
@@ -230,7 +230,7 @@ read.diet.diaries = function(filename,specs) {
   setnames(dd,"gender","f.gender")
   dd[,diet.id:=1:nrow(dd)]
   setkey(dd,diet.id)
-  cat("\n Reading Dietary Diaries completed")
+  cat(" Reading Dietary Diaries completed\n")
   return(dd)
 }
 
@@ -242,20 +242,30 @@ read.diet.diaries = function(filename,specs) {
 #' @export
 read.exp.factors = function(filename) {
   # Read exposure factors input file
-  dt <-fread(paste0("inputs/",filename),na.strings=".")
+  dt <-fread(paste0("inputs/",filename),na.strings=c(".","","NA"))
   if (nrow(dt)==0) stop ("No data on exposure factors file \n")
-  dt <- transform(dt, form = tolower(gsub(" ", "", form)))
-  dt$min.age[is.na(dt$min.age)] <- 0
-  dt$max.age[is.na(dt$max.age)] <- 99
-  mode(dt$gender) <- "character"
-  mode(dt$season) <- "character"
-  mode(dt$media)  <- "character"
+  if(exists("form",dt)) setnames(dt,"form","dist.type")
+  dt <- transform(dt, dist.type = tolower(gsub(" ", "",dist.type)))
+  mode(dt$par1)       <- "numeric"
+  mode(dt$par2)       <- "numeric"
+  mode(dt$par3)       <- "numeric"
+  mode(dt$par4)       <- "numeric"
+  mode(dt$lower.trun) <- "numeric"
+  mode(dt$upper.trun) <- "numeric"
+  mode(dt$min.age)    <- "numeric"
+  mode(dt$max.age)    <- "numeric"
+  mode(dt$resamp)     <- "character"
+  mode(dt$gender)     <- "character"
+  mode(dt$season)     <- "character"
+  mode(dt$media)      <- "character"
+  dt[is.na(dt$min.age)]$min.age <- 0
+  dt[is.na(dt$max.age)]$max.age <- 99
   dt$gender <- toupper(as.character(dt$gender))
   dt$season <- toupper(as.character(dt$season))
   dt$media  <- tolower(as.character(dt$media))
   setkey(dt, varname)
   dt$row <- 1:nrow(dt)
-  cat("\n Reading Exposure Factors completed")
+  cat(" Reading Exposure Factors completed\n")
   return(dt)
 }
 
@@ -281,7 +291,7 @@ read.fug.inputs = function(filename) {
   options(warn=0)
   dt <- transform(dt, form = tolower(gsub(" ", "", form)))
   dt$varname <- tolower(dt$varname)
-  # cat("\n Reading Fugacity Variables completed")
+  # cat(" Reading Fugacity Variables completed\n")
   return(dt)
 }
 
@@ -296,13 +306,17 @@ read.media.file = function(filename) {
   dt <- fread(paste0("inputs/",filename))
   setnames(dt,tolower(names(dt)))
   mode(dt$contact.p) <- "numeric"
+  mode(dt$min.age)   <- "numeric"
+  mode(dt$max.age)   <- "numeric"
   dt <- dt[dt$contact.p>0]
   if (nrow(dt)==0) stop("No data on exposure media file \n")
+  dt[is.na(dt$min.age)]$min.age <- 0
+  dt[is.na(dt$max.age)]$max.age <- 99
   dt$micro <- tolower(str_trim(dt$micro))
   dt$media <- tolower(str_trim(dt$media))
   dt$type  <- tolower(str_trim(dt$type))
   setkey(dt, micro)
-  cat("\n Reading Media File completed")
+  cat(" Reading Media File completed\n")
   return(dt)
 }
 
@@ -321,7 +335,7 @@ read.phys.file = function(filename) {
   dt <- dt[!is.na(dt$age)]
   if (nrow(dt)==0) stop("No data on physiology file \n")
   setkeyv(dt, c("gender","age"))
-  cat("\n Reading Physiology File completed")
+  cat(" Reading Physiology File completed\n")
   return(dt)
 }
 
@@ -343,7 +357,7 @@ read.pop.file = function(filename,specs) {
   pop <- pop[pop$age>=specs$min.age & pop$age<=specs$max.age]
   if (sum(pop$males)+sum(pop$females)==0) stop("No population left\n")
   setkey(pop, age)
-  cat("\n Reading Population File completed")
+  cat(" Reading Population File completed\n")
   return(pop)
 }
 
@@ -368,13 +382,56 @@ read.source.scen.file = function(filename) {
   names(dt)[substr(names(dt),1,16)=="product.indirect"]  <- "indir.fug"
   names(dt)[substr(names(dt),1,16)=="article.emission"]  <- "indir.y0"
   dt$source.type <- tolower(dt$source.type)
-  if(!exists("pucid",dt))     {fail=TRUE; cat("\n No sources on srcScen file")}
+  if(!exists("pucid",dt))     {fail <- TRUE; cat("\n No sources on srcScen file")}
   if(fail==TRUE) stop("\n Missing scenarios on source.scenarios file \n")
+  if(!exists("f.dermal1",dt))  dt$f.dermal1  <- 0.3
+  if(!exists("f.dermal2",dt))  dt$f.dermal2  <- 0.1
+  if(!exists("f.aerosol",dt))  dt$f.aerosol  <- 0.1
+  if(!exists("f.vapor",dt))    dt$f.vapor    <- 0.1
+  if(!exists("f.ingest",dt))   dt$f.ingest   <- 0.01
+  if(!exists("f.surface1",dt)) dt$f.surface1 <- 0.3
+  if(!exists("f.surface2",dt)) dt$f.surface2 <- 0.2
+  if(!exists("f.drain",dt))    dt$f.drain    <- 0.25
+  if(!exists("f.waste",dt))    dt$f.waste    <- 0.2
+  dt$f.dermal1[is.na(dt$f.dermal1)]   <- 0
+  dt$f.dermal2[is.na(dt$f.dermal2)]   <- 0
+  dt$f.aerosol[is.na(dt$f.aerosol)]   <- 0 
+  dt$f.vapor[is.na(dt$f.vapor)]       <- 0
+  dt$f.ingest[is.na(dt$f.ingest)]     <- 0
+  dt$f.surface1[is.na(dt$f.surface1)] <- 0
+  dt$f.surface2[is.na(dt$f.surface2)] <- 0
+  dt$f.drain[is.na(dt$f.drain)]       <- 0
+  dt$f.waste[is.na(dt$f.waste)]       <- 0
+  sum1 <- dt$f.dermal1 + dt$f.aerosol + dt$f.vapor + dt$f.ingest + dt$f.surface1
+  if(max(sum1)>1) {
+    for (i in 1:length(sum1)) {
+      if(sum1[i]>1) {
+        dt$f.dermal1[i]  <- dt$f.dermal1[i]  / sum1[i]
+        dt$f.aerosol[i]  <- dt$f.aerosol[i]  / sum1[i]
+        dt$f.vapor[i]    <- dt$f.vapor[i]    / sum1[i]
+        dt$f.ingest[i]   <- dt$f.ingest[i]   / sum1[i]
+        dt$f.surface1[i] <- dt$f.surface1[i] / sum1[i]
+      }
+    }
+  }
+  sum2 <-  dt$f.dermal2 + dt$f.aerosol + dt$f.vapor + dt$f.ingest + dt$f.surface2 + dt$f.drain + dt$f.waste
+  if(max(sum2)>1) {
+    for (i in 1:length(sum2)) {
+      if(sum2[i]>1) {
+        dt$f.dermal2[i]  <- dt$f.dermal2[i]  / sum2[i]
+        dt$f.aerosol[i]  <- dt$f.aerosol[i]  / sum2[i]
+        dt$f.vapor[i]    <- dt$f.vapor[i]    / sum2[i]
+        dt$f.ingest[i]   <- dt$f.ingest[i]   / sum2[i]
+        dt$f.surface2[i] <- dt$f.surface2[i] / sum2[i]
+      }
+    }
+  }
   dt <- check.src.scen.flags(dt)
   dt <- check.src.scen.types(dt)
   dt$nscen <- dt$dietary + dt$dirderm + dt$diringest + dt$dirinhaer +
     dt$dirinhvap + dt$downthedrain + dt$indir.fug + dt$indir.y0 + dt$migration
   dt <- dt[dt$nscen>0]
+  cat(" Reading Source.scenarios file completed\n")
   return(dt)
 }
 
@@ -396,7 +453,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 && x!=2) || (x==2 && min(df$dietary)!=0 && max(df$dietary)!=1) ||
      (x==1 && (!any(df$dietary==0) && !any(df$dietary==1)))) {
     fail=TRUE; cat("\n Bad dietary flags") }
-
+  
   if(mode(df$dirderm)!="numeric") {
     if(mode(df$dirderm)=="NULL") {df$dirderm <- 0 }
     df$dirderm <- tolower(str_trim(str_replace_all(df$dirderm,","," ")))
@@ -407,7 +464,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 && x!=2) || (x==2 && min(df$dirderm)!=0 && max(df$dirderm)!=1) ||
      (x==1 && (!any(df$dirderm==0) && !any(df$dirderm==1)))) {
     fail=TRUE; cat("\n Bad dirderm flags") }
-
+  
   if(mode(df$diringest)!="numeric") {
     if(mode(df$diringest)=="NULL") {df$diringest <- 0 }
     df$diringest <- tolower(str_trim(str_replace_all(df$diringest,","," ")))
@@ -418,7 +475,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 && x!=2) || (x==2 && min(df$diringest)!=0 && max(df$diringest)!=1) ||
      (x==1 && (!any(df$diringest==0) && !any(df$diringest==1)))) {
     fail=TRUE; cat("\n Bad diringest flags") }
-
+  
   if(mode(df$dirinhaer)!="numeric") {
     if(mode(df$dirinhaer)=="NULL") {df$dirinhaer <- 0 }
     df$dirinhaer <- tolower(str_trim(str_replace_all(df$dirinhaer,","," ")))
@@ -429,7 +486,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 && x!=2) || (x==2 && min(df$dirinhaer)!=0 && max(df$dirinhaer)!=1) ||
      (x==1 && (!any(df$dirinhaer==0) && !any(df$dirinhaer==1)))) {
     fail=TRUE; cat("\n Bad dirinhaer flags") }
-
+  
   if(mode(df$dirinhvap)!="numeric") {
     if(mode(df$dirinhvap)=="NULL") {df$dirinhvap <- 0 }
     df$dirinhvap <- tolower(str_trim(str_replace_all(df$dirinhvap,","," ")))
@@ -440,7 +497,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 && x!=2) || (x==2 && min(df$dirinhvap)!=0 && max(df$dirinhvap)!=1) ||
      (x==1 && (!any(df$dirinhvap==0) && !any(df$dirinhvap==1)))) {
     fail=TRUE; cat("\n Bad dirinhvap flags") }
-
+  
   if(mode(df$downthedrain)!="numeric") {
     if(mode(df$downthedrain)=="NULL") {df$downthedrain <- 0 }
     df$downthedrain <- tolower(str_trim(str_replace_all(df$downthedrain,","," ")))
@@ -451,7 +508,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 & x!=2) || (x==2 & min(df$downthedrain)!=0 & max(df$downthedrain)!=1)
      || (x==1 && (!any(df$downthedrain==0) && !any(df$downthedrain==1)))) {
     fail=TRUE; cat("\n Bad downthedrain flags") }
-
+  
   if(mode(df$indir.fug)!="numeric") {
     if(mode(df$indir.fug)=="NULL") {df$indir.fug <- 0 }
     df$indir.fug <- tolower(str_trim(str_replace_all(df$indir.fug,","," ")))
@@ -462,7 +519,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 & x!=2) || (x==2 & min(df$indir.fug)!=0 && max(df$indir.fug)!=1) ||
      (x==1 && (!any(df$indir.fug==0) && !any(df$indir.fug==1)))) {
     fail=TRUE; cat("\n Bad indir.fug flags") }
-
+  
   if(mode(df$indir.y0)!="numeric") {
     if(mode(df$indir.y0)=="NULL") {df$indir.y0 <- 0 }
     df$indir.y0 <- tolower(str_trim(str_replace_all(df$indir.y0,","," ")))
@@ -473,7 +530,7 @@ check.src.scen.flags = function(df) {
   if((x!=1 & x!=2) | (x==2 && min(df$indir.y0)!=0 && max(df$indir.y0)!=1) |
      (x==1 & (!any(df$indir.y0==0) & !any(df$indir.y0==1)))) {
     fail=TRUE; cat("\n Bad indir.y0 flags") }
-
+  
   if(fail==TRUE) stop("\n Bad option flags on source.scenarios file \n")
   return(df)
 }
@@ -603,7 +660,7 @@ read.source.chem.file = function(filename,source.scen,specs) {
   chem.list  <- sort(unique(dt$dtxsid))
   dt <- dt[dt$pucid %in% pucid]
   if (fail==TRUE) stop()
-  cat("\n Reading Source.chemicals file completed")
+  cat(" Reading Source.chemicals file completed\n")
   return(dt)
 }
 
@@ -685,11 +742,13 @@ read.source.vars.file = function(filename,src.scen) {
   }
   if(any(dt$mean<0,na.rm=TRUE)) {fail<-TRUE; cat("\n Negative mean on source_Vars file")}
   if(any(dt$cv<0,na.rm=TRUE))   {fail<-TRUE; cat("\n Negative cv on source_vars file") }
-
+  
   dt <- dt[dt$pucid %in% src.scen$pucid]
   aer.line <- dt[dt$varname=="f.aerosol"][1]
   dt$dist.type[dt$dist.type=='lognormal' & is.na(dt$cv)] <- 'point'
   dt$dist.type[dt$dist.type=='normal' & dt$cv>0.5] <- 'lognormal'
+  dt[dt$variable=="house.prev"]$variable <- "home.prev"
+  dt[dt$variable=="f.rinse"]$variable <- "f.drain"
   for (i in 1:nrow(src.scen)) {
     sc <- src.scen[i]
     v1 <- dt[dt$pucid==sc$pucid]
@@ -706,6 +765,9 @@ read.source.vars.file = function(filename,src.scen) {
     if (any(substr(v1$varname,1,5)=="f.res"))     f.res <-TRUE else f.res <-FALSE
     if (any(substr(v1$varname,1,5)=="f.ing"))     f.ing <-TRUE else f.ing <-FALSE
     if (any(substr(v1$varname,1,5)=="f.aer"))     f.aer <-TRUE else f.aer <-FALSE
+    if (any(substr(v1$varname,1,5)=="f.pum"))     f.pum <-TRUE else f.pum <-FALSE
+    if (any(substr(v1$varname,1,5)=="f.foa"))     f.foa <-TRUE else f.foa <-FALSE
+    if (any(substr(v1$varname,1,5)=="f.hos"))     f.hos <-TRUE else f.hos <-FALSE
     if (any(substr(v1$varname,1,5)=="f.dra"))     f.dra <-TRUE else f.dra <-FALSE
     if (sc$dirderm==1) {
       if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$pucid)
@@ -726,10 +788,14 @@ read.source.vars.file = function(filename,src.scen) {
       if (mass  ==FALSE) cat ("\n Mass missing for source ", sc$pucid)
       if (dur   ==FALSE) cat ("\n Duration missing for source ", sc$pucid)
       if (vol   ==FALSE) cat ("\n Volume missing for source ", sc$pucid)
-      if (f.aer ==FALSE) cat ("\n F.aerosol missing for source ", sc$pucid)
-      aer.line$pucid <- sc$pucid
-      dt <- rbindlist(list(dt,aer.line))
-      setorder(dt,pucid,varname)
+      frm <- substr(sc$form,1,3)
+      if (frm=="aer" & f.aer ==FALSE) cat ("\n F.aerosol missing for source ", sc$pucid)
+      if (frm=="pum" & f.pum ==FALSE) cat ("\n F.pump_spray missing for source ", sc$pucid)
+      if (frm=="foa" & f.foa ==FALSE) cat ("\n F.foam_spray missing for source ", sc$pucid)
+      if (frm=="hos" & f.hos ==FALSE) cat ("\n F.hose_spray missing for source ", sc$pucid)
+      # aer.line$pucid <- sc$pucid
+      # dt <- rbindlist(list(dt,aer.line))
+      # setorder(dt,pucid,varname)
     }
     if (sc$dirinhvap==1) {
       if (u.prev==FALSE) cat ("\n Use.prev missing for source ", sc$pucid)
@@ -757,7 +823,7 @@ read.source.vars.file = function(filename,src.scen) {
   }
   if (fail==TRUE) stop("\n Bad data on source.variables file \n")
   dt <- unique(dt)
-  cat("\n Reading Source.variables file completed")
+  cat(" Reading Source.variables file completed\n")
   tester<<-dt
   return(dt)
 }

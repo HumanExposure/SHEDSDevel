@@ -1,13 +1,15 @@
 # This is the main module of EPA's SHEDS-HT chemical exposure model.
 # This model is derived from SHEDS-Lite; before that SHEDS-Multimedia.
 # First R version programmed by WGG in 2012
-# Latest changes by KKI on Nov 16, 2017
+# Latest changes by WGG on Jan 13, 2020
 # To run SHEDS-HT, open this module in R or R-studio, source this module
 # and type run() to use the default run file "Run_test.txt",
 # or specify an alternate run file (in quotes) as an argument to run().
+# The optional second argument to run() is the working directory, which
+# is the main folder where the Sheds_HT.R code is located.
 # All input files must be in the /inputs folder under the working
-# directory wd. If moving this code to a new location, change the
-# default "wd=" argument in the run() function call immediately below.
+# directory wd. If desired, change the default "wd=" argument in the
+# run() function call immediately below.
 
 #' run
 #'
@@ -53,19 +55,20 @@ run = function(run.file="", wd="") {
   source.chem   <- read.source.chem.file(specs$source.chem.file, source.scen,specs)
   specs         <- update.specs(specs,source.chem)
   source.scen   <- source.scen[source.scen$pucid %in% source.chem$pucid]
+  if(nrow(source.scen)==0) stop("\n No products left containing this chemical\n")
   source.scen$row <- 1:nrow(source.scen)
   source.vars   <- read.source.vars.file(specs$source.vars.file,source.scen)
   source.chem   <- source.chem[source.chem$pucid %in% source.scen$pucid]
-
+  specs         <- update.specs(specs,source.chem)
   act.pools     <- act.diary.pools(act.diaries,specs)
   diet.pools    <- diet.diary.pools(diet.diaries,specs)
   gen.facs      <- gen.factor.tables(exp.factors)
   med.facs      <- med.factor.tables(exp.factors,media.sur)
   sv            <- set.pars(source.vars)
   scv           <- set.pars(source.chem)
-
+  
   sets <- ceiling(specs$n.persons/specs$set.size)
-
+  
   for (set in 1:sets) {
     if (set<sets) n.per <- specs$set.size else
       n.per <- specs$n.persons-specs$set.size*(set-1)
@@ -99,7 +102,7 @@ run = function(run.file="", wd="") {
     n.svar    <- length(svar.list)
     src.data  <- array(0,c(n.pucs,n.per,n.svar))
     n.sdist   <- nrow(sv)
-
+    
     if (n.sdist>0) {
       for (s in 1:n.sdist) {
         q <- runif(n.per)
@@ -112,7 +115,6 @@ run = function(run.file="", wd="") {
     }
     for (c in 1:specs$n.chem) {
       if(exists("fexp")) rm(fexp, inherits = TRUE)
-
       chem      <- specs$chem.list[c]
       cb        <- make.cbase(base,chem)
       cprops    <- chem.props[chem.props$dtxsid==chem]
@@ -126,7 +128,7 @@ run = function(run.file="", wd="") {
         setnames(src.means,names(src.means),c("exp.dermal","exp.ingest","exp.inhal","dose.inhal",
                                               "f.dermal","f.ingest","f.inhal","mean.mass"))
         src.names <- c(src.form,"Total")
-
+        
         for (s in 1:nrow(src.form)) {              # needs to be all (pucid,form) combinations
           cat("\n Starting source ",s, " of ",nrow(src.form),", of chem ",c,"(",cprops$dtxsid,") of ",specs$n.chem)
           src  <- src.form[s]$pucid
@@ -147,7 +149,7 @@ run = function(run.file="", wd="") {
           io <- scens$indoor
           if (any(names(sdata)=="use.freq")) {sdata$use.today<-p.round(sdata$use.freq/365)}
           if(scens$dietary==1) {
-            dietary <- food.residue(chem.var,cb,src)
+            dietary <- food.residue(chem.var,cb,src,scens)
             add     <- dietary$exp.ingest.dietary
             src.means$exp.ingest[s] <- src.means$exp.ingest[s] + mean(add)
             src.means$f.ingest[s]   <- 1
@@ -155,7 +157,7 @@ run = function(run.file="", wd="") {
             cb$exp.dietary.tot <- cb$exp.dietary.tot + add
           }
           if(scens$dirderm==1) {
-            dir.derm                <- dir.dermal(sdata,chem.var)
+            dir.derm                <- dir.dermal(sdata,chem.var,scens)
             add                     <- dir.derm$exp.dermal.dirderm
             src.means$exp.dermal[s] <- src.means$exp.dermal[s] +mean(add)
             mean.mass               <- mean(sdata$mass*chem.var*1E6)
@@ -164,7 +166,7 @@ run = function(run.file="", wd="") {
             cb$exp.dermal.tot       <- cb$exp.dermal.tot + add
           }
           if(scens$diringest==1) {
-            dir.ingest              <- dir.ingested(sdata,chem.var)
+            dir.ingest              <- dir.ingested(sdata,chem.var,scens)
             add                     <- dir.ingest$exp.ingest.diringest
             src.means$exp.ingest[s] <- src.means$exp.ingest[s] + mean(add)
             mean.mass               <- mean(sdata$mass*chem.var*1E6)
@@ -174,7 +176,8 @@ run = function(run.file="", wd="") {
             cb$exp.nondiet.tot      <- cb$exp.nondiet.tot + add
           }
           if(scens$dirinhaer==1) {
-            dir.inh.aer             <- dir.inhal.aer(sdata,chem.var,cb,io)
+            frm                     <- substr(scens$form,1,3)
+            dir.inh.aer             <- dir.inhal.aer(sdata,chem.var,cb,io,frm,scens)
             addexp                  <- dir.inh.aer$exp.inhal.dirinhaer
             adddose                 <- dir.inh.aer$dose.inhal.dirinhaer
             src.means$exp.inhal[s]  <- src.means$exp.inhal[s]  + mean(addexp)
@@ -187,7 +190,7 @@ run = function(run.file="", wd="") {
             cb$dose.inhal.tot       <- cb$dose.inhal.tot + adddose
           }
           if(scens$dirinhvap==1) {
-            dir.inh.vap             <- dir.inhal.vap(sdata,chem.var,cprops,cb,io)
+            dir.inh.vap             <- dir.inhal.vap(sdata,chem.var,cprops,cb,io,scens)
             addexp                  <- dir.inh.vap$exp.inhal.dirinhvap
             adddose                 <- dir.inh.vap$dose.inhal.dirinhvap
             src.means$exp.inhal[s]  <- src.means$exp.inhal[s]  + mean(addexp)
@@ -200,11 +203,11 @@ run = function(run.file="", wd="") {
             cb$dose.inhal.tot       <- cb$dose.inhal.tot + adddose
           }
           if(scens$downthedrain==1) {
-            exp.ddd.mass   <- down.the.drain.mass(sdata,chem.var)
+            exp.ddd.mass   <- down.the.drain.mass(sdata,chem.var,scens)
             cb$exp.ddd.tot <- cb$exp.ddd.tot + exp.ddd.mass
           }
           if(scens$indir.fug==1) {
-            fug.concs   <- get.fug.concs(sdata,chem.var,pdmff,cfug)
+            fug.concs   <- get.fug.concs(sdata,chem.var,pdmff,cfug,scens)
             outwindow   <- fug.concs$mass.air * pdmff$aer.out
             indir       <- indir.exposure(sdata,cb,fug.concs,has.chem)
             src.means$exp.dermal[s] <- src.means$exp.dermal[s] + mean(indir$exp.dermal.indirect)
@@ -227,38 +230,38 @@ run = function(run.file="", wd="") {
             cb$exp.window.tot  <- cb$exp.window.tot  + outwindow
           }
           if(scens$indir.y0==1) {
-             y0.concs    <- get.y0.concs(sdata,chem.var,pdmff,cfug)
-             outwindow   <- y0.concs$mass.air * pdmff$aer.out
-             indir       <- indir.exposure(sdata,cb,y0.concs,chem.var)
-             src.means$exp.dermal[s] <- src.means$exp.dermal[s] + mean(indir$exp.dermal.indirect)
-             src.means$exp.ingest[s] <- src.means$exp.ingest[s] + mean(indir$exp.ingest.indirect)
-             src.means$exp.inhal[s]  <- src.means$exp.inhal[s]  + mean(indir$exp.inhal.indirect)
-             src.means$dose.inhal[s] <- src.means$dose.inhal[s] + mean(indir$dose.inhal.indirect)
-             y0.tot.mass             <- y0.concs$mass.air + y0.concs$mass.sur
-             mean.mass               <- mean(y0.tot.mass*has.chem*1E6)
-             src.means$mean.mass[s]  <- mean.mass
-             if(mean.mass>0) {
-               src.means$f.dermal[s] <- src.means$exp.dermal[s]/mean.mass
-               src.means$f.ingest[s] <- src.means$exp.ingest[s]/mean.mass
-               src.means$f.inhal[s]  <- src.means$dose.inhal[s]/mean.mass
-             }
-             cb$exp.dermal.tot  <- cb$exp.dermal.tot  + indir$exp.dermal.indirect
-             cb$exp.ingest.tot  <- cb$exp.ingest.tot  + indir$exp.ingest.indirect
-             cb$exp.nondiet.tot <- cb$exp.nondiet.tot + indir$exp.ingest.indirect
-             cb$exp.inhal.tot   <- cb$exp.inhal.tot   + indir$exp.inhal.indirect
-             cb$dose.inhal.tot  <- cb$dose.inhal.tot  + indir$dose.inhal.indirect
-             cb$exp.window.tot  <- cb$exp.window.tot  + outwindow
+            y0.concs    <- get.y0.concs(sdata,chem.var,pdmff,cfug)
+            outwindow   <- y0.concs$mass.air * pdmff$aer.out
+            indir       <- indir.exposure(sdata,cb,y0.concs,chem.var)
+            src.means$exp.dermal[s] <- src.means$exp.dermal[s] + mean(indir$exp.dermal.indirect)
+            src.means$exp.ingest[s] <- src.means$exp.ingest[s] + mean(indir$exp.ingest.indirect)
+            src.means$exp.inhal[s]  <- src.means$exp.inhal[s]  + mean(indir$exp.inhal.indirect)
+            src.means$dose.inhal[s] <- src.means$dose.inhal[s] + mean(indir$dose.inhal.indirect)
+            y0.tot.mass             <- y0.concs$mass.air + y0.concs$mass.sur
+            mean.mass               <- mean(y0.tot.mass*has.chem*1E6)
+            src.means$mean.mass[s]  <- mean.mass
+            if(mean.mass>0) {
+              src.means$f.dermal[s] <- src.means$exp.dermal[s]/mean.mass
+              src.means$f.ingest[s] <- src.means$exp.ingest[s]/mean.mass
+              src.means$f.inhal[s]  <- src.means$dose.inhal[s]/mean.mass
+            }
+            cb$exp.dermal.tot  <- cb$exp.dermal.tot  + indir$exp.dermal.indirect
+            cb$exp.ingest.tot  <- cb$exp.ingest.tot  + indir$exp.ingest.indirect
+            cb$exp.nondiet.tot <- cb$exp.nondiet.tot + indir$exp.ingest.indirect
+            cb$exp.inhal.tot   <- cb$exp.inhal.tot   + indir$exp.inhal.indirect
+            cb$dose.inhal.tot  <- cb$dose.inhal.tot  + indir$dose.inhal.indirect
+            cb$exp.window.tot  <- cb$exp.window.tot  + outwindow
           }
           if(scens$migration==1){
-             migration <- food.migration(chem.var,cb,src)
-             add       <- migration$exp.ingest.migrat
-             src.means$exp.ingest[s] <- src.means$exp.ingest[s] + mean(add)
-             src.means$f.ingest[s]   <- 1
-             cb$exp.ingest.tot <- cb$exp.ingest.tot  + add
-             cb$exp.migrat.tot <- cb$exp.migrat.tot + add
+            migration <- food.migration(chem.var,cb,src,scens)
+            add       <- migration$exp.ingest.migrat
+            src.means$exp.ingest[s] <- src.means$exp.ingest[s] + mean(add)
+            src.means$f.ingest[s]   <- 1
+            cb$exp.ingest.tot <- cb$exp.ingest.tot  + add
+            cb$exp.migrat.tot <- cb$exp.migrat.tot + add
           }
         } # end loop over sources
-
+        
         fexp   <- post.exposure(cb,cprops)
         summarize.chemical(fexp,c,chem,cprops$chem.name,set,sets,specs)
         if (specs$person.output==1) write.persons(fexp,chem,set,specs)
@@ -284,7 +287,7 @@ run = function(run.file="", wd="") {
       } # end of if(nrow(src.form)>0) block
     } # end loop over chemical
   } # end loop over sets
-
+  
   if (specs$person.output==1) {
     dir  <- paste0("output/",specs$run.name,"/")
     for (c in 1:specs$n.chem) {
@@ -370,13 +373,13 @@ setup = function(wd="") {
   cat("\nShedsHT Version 0.1.7 (02/21/2019)")
   cat("\nDisclaimer")
   cat("\nThe United States Environmental Protection Agency through its Office of Research and Development
-  funded and collaborated in the research and development of this software, in part under Contract EP-C-14-001
-  to ICF International. The model is publicly available in Beta version form. All input data used for a given
-  application should be reviewed by the researcher so that the model results are based on appropriate data
-  sources for the given application. This model, default input files, and R package are under continued development
-  and testing. The model equations and approach are published in the peer-reviewed literature
-  (Isaacs et al. Environ. Sci. Technol. 2014, 48, 12750-12759). The data included herein do not represent
-  and should not be construed to represent any Agency determination or policy.\n")
+      funded and collaborated in the research and development of this software, in part under Contract EP-C-14-001
+      to ICF International. The model is publicly available in Beta version form. All input data used for a given
+      application should be reviewed by the researcher so that the model results are based on appropriate data
+      sources for the given application. This model, default input files, and R package are under continued development
+      and testing. The model equations and approach are published in the peer-reviewed literature
+      (Isaacs et al. Environ. Sci. Technol. 2014, 48, 12750-12759). The data included herein do not represent
+      and should not be construed to represent any Agency determination or policy.\n")
   if (wd!="") setwd(wd)
   suppressPackageStartupMessages(TRUE)
   # Load required packages
@@ -547,6 +550,8 @@ gen.factor.tables = function(ef=exp.factors) {
     }
   }
   exp.gen <- expgen[(nrow(dt)+1):nrow(expgen)]
+  exp.gen[is.na(exp.gen$min.age)]$min.age <- 0
+  exp.gen[is.na(exp.gen$max.age)]$max.age <- 99
   cat("\n General Factor Tables completed")
   return(exp.gen)
 }
@@ -766,7 +771,7 @@ chem.scenarios = function(all) {
 select.people = function(n, pop, py, act.p, diet.p, act.d, diet.d,specs) {
   # generate random numbers
   q <- matrix(runif(10*n),nrow=n,ncol=10)
-
+  
   # find gender counts
   person  <- 1:n
   males   <- sum(pop$males)
@@ -785,7 +790,7 @@ select.people = function(n, pop, py, act.p, diet.p, act.d, diet.d,specs) {
   }
   season  <- distrib("empi",q=q[,3],v=specs$seasons)
   weekend <- distrib("bern",q=q[,4],0.285714)
-
+  
   # assign physiology
   r <- age+1+100*(gender=="M")
   py[is.na(py)]<- 0
@@ -809,7 +814,7 @@ select.people = function(n, pop, py, act.p, diet.p, act.d, diet.d,specs) {
   surfarea <- surf2
   surfarea[age<=5]  <- surf1[age<=5]
   surfarea[age>=20] <- surf3[age>=20]
-
+  
   # select diary matched by gender, season, weekend, and age
   diary.id <- vector("integer",n)
   diet.id  <- vector("integer",n)
@@ -820,7 +825,7 @@ select.people = function(n, pop, py, act.p, diet.p, act.d, diet.d,specs) {
     diet.id[i]  <- distrib("empi",q=q[,10][[i]],v=diet.p[[dtype]])
   }
   people <- as.data.table(data.frame(person,gender,age,season,weekend,weight,height,
-                                    bmr,bva,surfarea,diary.id,diet.id,stringsAsFactors = FALSE))
+                                     bmr,bva,surfarea,diary.id,diet.id,stringsAsFactors = FALSE))
   setkey(people,person,diary.id)
   pd1 <- as.data.table(left_join(people,act.d,by="diary.id"))
   setkey(pd1,person,diet.id)
@@ -930,6 +935,7 @@ add.media = function(n, media, pd) {
 #'
 #' @export
 #'
+# add.factors(n.per,gen.facs,med.facs,exp.factors,media.sur,pdm)
 add.factors = function(n, gen.f, med.f, exp.f, surf, pdm) {
   cols <- length(surf)
   vmed <- as.character(unique(med.f$varname))
@@ -937,8 +943,8 @@ add.factors = function(n, gen.f, med.f, exp.f, surf, pdm) {
   w    <- length(vmed)*cols+length(vgen)
   med.f$media <- tolower(med.f$media)
   # generate random numbers
-  q <- matrix(runif(n*w),nrow=n)
-  r <- data.table(matrix(0,nrow=n,ncol=w))
+  qt <- matrix(runif(n*w),nrow=n)
+  rt <- data.table(matrix(0,nrow=n,ncol=w))
   setkey(pdm,gender,season,age)
   for (v in 1:length(vmed)) {
     var <- vmed[v]
@@ -950,8 +956,8 @@ add.factors = function(n, gen.f, med.f, exp.f, surf, pdm) {
       p <- p[(p$min.age<=p$age)&(p$age<=p$max.age)]
       setkey(p,person)
       col <- length(vmed)*(m-1)+v
-      r[,col] <- eval.factors(p$row,q[,col],exp.f)
-      setnames(r,paste0("V",col),paste0(var,".",med))
+      rt[,col] <- eval.factors(p$row,qt[,col],exp.f)
+      setnames(rt,paste0("V",col),paste0(var,".",med))
     }
   }
   for (v in 1:length(vgen)) {
@@ -961,13 +967,14 @@ add.factors = function(n, gen.f, med.f, exp.f, surf, pdm) {
     p <- p[(p$min.age<=p$age)&(p$age<=p$max.age)]
     setkey(p,person)
     col <- length(vmed)*length(surf)+v
-    r[,col] <- eval.factors(p$row,q[,col],exp.f)
-    setnames(r,paste("V",col,sep=""),vgen[v])
+    rt[,col] <- eval.factors(p$row,qt[,col],exp.f)
+    setnames(rt,paste("V",col,sep=""),vgen[v])
   }
-  hand.washes <- round(r$handwash.freq +
-                         sqrt(r$handwash.freq)*(2*q[,w]-1))
-  bath <- as.logical(pdm$bath.mins+r$bath.p)
-  pdmf <- cbind(pdm,r,bath,hand.washes)
+  # hand.washes <- round(r$handwash.freq +
+  #                        sqrt(r$handwash.freq)*(2*qt[,w]-1))
+  # bath <- as.logical(pdm$bath.mins+r$bath.p)
+  # pdmf <- cbind(pdm,rt,bath,hand.washes)
+  pdmf <- cbind(pdm,rt)
   return(pdmf)
 }
 
@@ -1011,7 +1018,7 @@ eval.factors = function(r, q, ef) {
   z    <- vector("numeric",n)
   if (nr>0) { for (i in 1:nr) {
     j <- ur[i]
-    z[r==j] <- distrib(ef$form[j],ef$par1[j],ef$par2[j],ef$par3[j],
+    z[r==j] <- distrib(ef$dist.type[j],ef$par1[j],ef$par2[j],ef$par3[j],
                        ef$par4[j],ef$lower.trun[j],ef$upper.trun[j],
                        ef$resamp[j],q=q[r==j],p=ef$probs[j],v=ef$values[j])
   } }
@@ -1225,15 +1232,18 @@ scen.factor.indices = function(sdat,expgen) {
 #'
 #' @export
 
-dir.dermal = function(sd,cd) {
+dir.dermal = function(sd,chem.var,scens) {
   n <- nrow(sd)
   exp.inhal.dirderm  <- rep(0,n)
   dose.inhal.dirderm <- rep(0,n)
   exp.ingest.dirderm <- rep(0,n)
   if (exists("f.contact",sd)==FALSE) sd$f.contact <- 1
-  exp.dermal.dirderm <- sd$use.prev * sd$use.today *
-    sd$mass * cd * sd$f.residual * sd$f.contact * 1E6
-  # mass in [g], use.freq/365 gives #/day, others are [-], 1E6 is [ug/g]
+  #exp.dermal.dirderm <- sd$use.prev * sd$use.today *
+  #  sd$mass * chem.var * sd$f.residual * sd$f.contact * 1E6
+  exp.dermal.dirderm1 <- sd$use.prev * sd$use.today * sd$mass * chem.var * scens$f.dermal1 * 1E6
+  exp.dermal.dirderm2 <- sd$use.prev * sd$use.today * sd$mass * chem.var * scens$f.dermal2 * 1E6 
+  exp.dermal.dirderm  <- exp.dermal.dirderm2
+  # mass in [g], use.today gives #uses on this day, others are [-], 1E6 is [ug/g]
   dir.derm  <- as.data.table(cbind(exp.dermal.dirderm, exp.ingest.dirderm,
                                    exp.inhal.dirderm, dose.inhal.dirderm))
   return(dir.derm)
@@ -1271,12 +1281,12 @@ dir.dermal = function(sd,cd) {
 #'
 #' @export
 
-dir.ingested = function(sd,cd) {
+dir.ingested = function(sd,chem.var,scens) {
   n <- nrow(sd)
   exp.inhal.diringest  <- rep(0,n)
   dose.inhal.diringest <- rep(0,n)
   exp.dermal.diringest <- rep(0,n)
-  exp.ingest.diringest <- sd$use.prev * sd$use.today * sd$mass * cd * sd$f.ingested * 1E6
+  exp.ingest.diringest <- sd$use.prev * sd$use.today * sd$mass * chem.var * scens$f.ingest * 1E6
   # mass in [g],cd & f.ingested are [-], 1E6 gives [ug]
   dir.ingest  <- as.data.table(cbind(exp.dermal.diringest,exp.ingest.diringest,exp.inhal.diringest, dose.inhal.diringest))
   # cat("\n dir.ingest = ",dir.ingest$exp.ingest.diringest[1:n])
@@ -1328,18 +1338,26 @@ dir.ingested = function(sd,cd) {
 #'
 #' @export
 
-dir.inhal.aer = function(sd,cd,cb,io) {
+dir.inhal.aer = function(sd,cd,cb,io,frm,scens) {
   n <- nrow(sd)
   exp.dermal.dirinhaer <- rep(0,n)
   exp.ingest.dirinhaer <- rep(0,n)
-  if (exists("f.aerosol",sd)==FALSE) sd$f.aerosol <- 0.5
+  # if (exists("f.aerosol",sd)   ==FALSE) sd$f.aerosol    <- 0.75
+  # if (exists("f.pump_spray",sd)==FALSE) sd$f.pump_spray <- 0.50
+  # if (exists("f.foam_spray",sd)==FALSE) sd$f.foam_spray <- 0.30
+  # if (exists("f.hose_spray",sd)==FALSE) sd$f.hose_spray <- 0.25
   if (exists("volume"  ,sd)==FALSE && io==1)  sd$volume <- 24
   if (exists("volume"  ,sd)==FALSE && io==0)  sd$volume <- 480
   if (exists("duration",sd)==FALSE)  sd$duration  <- 1
-  volume               <- sd$volume
+  # if (frm=="aer") f.air <- sd$f.aerosol
+  # if (frm=="pum") f.air <- sd$f.pump_spray
+  # if (frm=="foa") f.air <- sd$f.foam_spray
+  # if (frm=="hos") f.air <- sd$f.hose_spray
+  f.air <- scens$f.aerosol
+  volume <- sd$volume
   if (io==1) volume[volume<24]  <- 24
   if (io==0) volume[volume<480] <- 480
-  airconc <- sd$mass * cd * sd$f.aerosol / volume
+  airconc <- sd$mass * cd * f.air / volume
   # the following limits chemical concentrations to 0.1% of air
   airconc[airconc>1.2] <- 1.2
   # mass in g, vol in [m3], others unitless, airconc in [g/m3]
@@ -1411,7 +1429,7 @@ dir.inhal.aer = function(sd,cd,cb,io) {
 #'
 #' @export
 
-dir.inhal.vap = function(sd,frac.chem,cprops,cb,io) {
+dir.inhal.vap = function(sd,frac.chem,cprops,cb,io,scens) {
   n <- nrow(sd)
   exp.dermal.dirinhvap <- rep(0,n)
   exp.ingest.dirinhvap <- rep(0,n)
@@ -1422,7 +1440,7 @@ dir.inhal.vap = function(sd,frac.chem,cprops,cb,io) {
   molwt                <- cprops$mw
   if (is.na(vapor))  vapor <- 1
   if (is.na(molwt))  molwt <- 100
-  vapfrac              <- vapor
+  vapfrac              <- pmin(vapor,scens$f.vapor)
   # vapfrac is the mass fraction that can evaporate
   vapfrac[vapfrac>1]   <- 1
   evap                 <- sd$mass * frac.chem * vapfrac
@@ -1480,11 +1498,11 @@ dir.inhal.vap = function(sd,frac.chem,cprops,cb,io) {
 #'
 #' @export
 
-down.the.drain.mass = function(sd,frac.chem) {
+down.the.drain.mass = function(sd,frac.chem,scens) {
   n <- nrow(sd)
   exp.ddd.mass <- rep(0,n)
   exp.ddd.mass <- sd$use.prev * sd$use.today *
-    sd$mass * frac.chem * sd$f.drain
+    sd$mass * frac.chem * scens$f.drain
   # mass in g, others unitless, ddd.mass in [g/day]
   return(signif(exp.ddd.mass,5))
 }
@@ -1524,7 +1542,7 @@ down.the.drain.mass = function(sd,frac.chem) {
 #'
 #' @export
 
-food.residue = function(chem.ugg,cb,ftype) {
+food.residue = function(chem.ugg,cb,ftype,scens) {
   n <- nrow(cb)
   exp.inhal.dietary  <- rep(0,n)
   dose.inhal.dietary <- rep(0,n)
@@ -1532,7 +1550,7 @@ food.residue = function(chem.ugg,cb,ftype) {
   diet               <- rep(0,n)
   names(diet)        <- "exp.diet"
   cbf  <- eval(parse(text=paste0("cb$",tolower(ftype))))
-  if (!is.null(cbf)) diet <- diet + cbf*chem.ugg
+  if (!is.null(cbf)) diet <- diet + cbf*chem.ugg*scens$f.ingest
   # chem.ugg in [ug/g], food mass cbf in [g], result in [ug]
   exp.ingest.dietary <- diet
   if(min(exp.ingest.dietary)<0) cat("\n Negative exposure dir.dietary")
@@ -1571,7 +1589,7 @@ food.residue = function(chem.ugg,cb,ftype) {
 #'
 #' @export
 
-food.migration = function(chem.ugg,cb,ftype) {
+food.migration = function(chem.ugg,cb,ftype,scens) {
   n <- nrow(cb)
   exp.inhal.migrat  <- rep(0,n)
   dose.inhal.migrat <- rep(0,n)
@@ -1579,12 +1597,12 @@ food.migration = function(chem.ugg,cb,ftype) {
   migrat            <- rep(0,n)
   names(migrat)     <- "exp.migrat"
   cbf  <- eval(parse(text=paste0("cb$",tolower(ftype))))
-  if (!is.null(cbf)) migrat <- migrat + cbf*chem.ugg
+  if (!is.null(cbf)) migrat <- migrat + cbf*chem.ugg*f.ingest
   # chem.ugg [ug/g], food mass cbf [g], result [ug]
   exp.ingest.migrat <- migrat
   if(min(exp.ingest.migrat)<0) cat("\n Negative exposure food.migration")
   migration  <- as.data.table(cbind(exp.dermal.migrat, exp.ingest.migrat,
-                                  exp.inhal.migrat, dose.inhal.migrat))
+                                    exp.inhal.migrat, dose.inhal.migrat))
   return(migration)
 }
 
@@ -1704,39 +1722,35 @@ indir.exposure = function(sd,cb,concs,has.chem) {
 #' @export
 #'
 post.exposure = function(cb,cprops) {
-  remf.bath   <- cb$rem.bath.f * cb$bath
-  remf.wash   <- cb$rem.handwash.f * (1-exp(-cb$hand.washes/1.6))
-  remf.hmouth <- cb$rem.handwash.f * exp(-cb$hand.washes/11) *
-    cb$handmouth.area.f * sqrt(cb$handmouth.freq)
-  remf.brush  <- cb$rem.brushoff.f
-  Kpfactor    <- cprops$kp/0.208
-  if(is.na(Kpfactor)) Kpfactor <- 1
-  # default Kp is value for Permethrin
-  remf.absorb <- cb$rem.derm.abs.f * Kpfactor
-  sum <- remf.bath + remf.wash + remf.hmouth + remf.brush + remf.absorb
-
-  rem.bath   <- cb$exp.dermal.tot * remf.bath/sum
-  rem.wash   <- cb$exp.dermal.tot * remf.wash/sum
-  rem.hmouth <- cb$exp.dermal.tot * remf.hmouth/sum
-  rem.brush  <- cb$exp.dermal.tot * remf.brush/sum
-  rem.absorb <- cb$exp.dermal.tot * remf.absorb/sum
-
-  ingest.abs.f<-cprops$fabs
-  exp.hmouth.tot   <- rem.hmouth
-  exp.ingest.tot   <- cb$exp.ingest.tot + exp.hmouth.tot
-  dose.intake.ug   <- exp.ingest.tot + cb$dose.inhal.tot + rem.absorb
-  dose.intake.mgkg <- dose.intake.ug/(1000*cb$weight)
-  abs.dermal.ug    <- rem.absorb
-  abs.ingest.ug    <- exp.ingest.tot * ingest.abs.f
-  abs.hm.ug        <- exp.hmouth.tot * ingest.abs.f
-  abs.inhal.ug     <- cb$dose.inhal.tot * cb$inhal.abs.f
-  abs.tot.ug       <- abs.dermal.ug + abs.ingest.ug + abs.inhal.ug
-  abs.tot.mgkg     <- abs.tot.ug/(1000*cb$weight)
-  urine.tot.ug     <- abs.tot.ug * cb$urine.f
-
-  fexp <- as.data.table(cbind(cb, rem.bath, rem.wash, rem.hmouth,
-                              rem.brush, rem.absorb, exp.hmouth.tot, dose.intake.ug,
-                              dose.intake.mgkg, abs.dermal.ug, abs.ingest.ug,
+  # remf.bath   <- cb$rem.bath.f * cb$bath
+  # remf.wash   <- cb$rem.handwash.f * (1-exp(-cb$hand.washes/1.6))
+  # remf.hmouth <- cb$rem.handwash.f * exp(-cb$hand.washes/11) *
+  #   cb$handmouth.area.f * sqrt(cb$handmouth.freq)
+  # remf.brush  <- cb$rem.brushoff.f
+  Kpfactor          <- cprops$kp/0.208                  # 0.208 = Kp for permethrin
+  if(is.na(Kpfactor)) Kpfactor <- 1                     # ratio Kp(chem)/Kp(permethrin)
+  if(!exists("dermal.abs.f",cb)) cb$dermal.abs.f <- 0.5
+  k.absorb          <- cb$k.absorb * Kpfactor           # use local variable so next chem is not affected
+  sum               <- cb$k.wash + cb$k.mouth + cb$k.brush + k.absorb
+  rem.wash          <- cb$exp.dermal.tot * cb$k.wash  / sum
+  rem.hmouth        <- cb$exp.dermal.tot * cb$k.mouth / sum
+  rem.brush         <- cb$exp.dermal.tot * cb$k.brush / sum
+  rem.absorb        <- cb$exp.dermal.tot * k.absorb   / sum
+  ingest.abs.f      <- cprops$fabs
+  exp.hmouth.tot    <- rem.hmouth
+  cb$exp.ingest.tot <- cb$exp.ingest.tot + exp.hmouth.tot
+  dose.intake.ug    <- cb$exp.ingest.tot + cb$dose.inhal.tot + rem.absorb
+  dose.intake.mgkg  <- dose.intake.ug/(1000*cb$weight)
+  abs.dermal.ug     <- rem.absorb        * cb$dermal.abs.f
+  abs.ingest.ug     <- cb$exp.ingest.tot * ingest.abs.f
+  abs.hm.ug         <- exp.hmouth.tot    * ingest.abs.f
+  abs.inhal.ug      <- cb$dose.inhal.tot * cb$inhal.abs.f
+  abs.tot.ug        <- abs.dermal.ug + abs.ingest.ug + abs.inhal.ug
+  abs.tot.mgkg      <- abs.tot.ug/(1000*cb$weight)
+  urine.tot.ug      <- abs.tot.ug * cb$urine.f
+  
+  fexp <- as.data.table(cbind(cb, rem.wash, rem.hmouth, rem.brush, rem.absorb, exp.hmouth.tot, 
+                              dose.intake.ug, dose.intake.mgkg, abs.dermal.ug, abs.ingest.ug,
                               abs.inhal.ug, abs.tot.ug, abs.tot.mgkg, urine.tot.ug,abs.hm.ug))
   return(fexp)
 }

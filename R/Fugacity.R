@@ -273,42 +273,47 @@ chem.fug = function(n.per,cprops,x) {
 #'
 #' @export
 
-get.fug.concs = function(sdata,frac.chem,x,cfug) {
+get.fug.concs = function(sdata,frac.chem,x,cfug,scens) {
   n            <- nrow(x)
-  chem.mass    <- 1E6 * sdata$mass * frac.chem                   # sdata$mass [g], chem.mass [ug]
-  app.rate.sur <- chem.mass/x$area.sur                           # app.rate.sur [ug/m2]
-  app.rate.air <- app.rate.sur/1E6                               # app.rate.air [ug/m3]
+  frac.res     <- scens$f.surface2+scens$f.aerosol+scens$f.vapor    # fraction left in house after use
+  frac.res     <- max(frac.res,0.000001)                            # avoid any division by zero
+  f.sur        <- scens$f.surface2/frac.res                         # surface portion
+  f.air        <- (scens$f.aerosol + scens$f.vapor)/frac.res        # air portion
+  chem.mass    <- 1E6 * sdata$mass * frac.chem * frac.res           # sdata$mass [g], chem.mass [ug]
+  vol.air      <- x$area.sur * x$height                             # vol.air [m3]
+  app.rate.sur <- chem.mass/x$area.sur * f.sur                      # app.rate.sur [ug/m2]
+  app.rate.air <- chem.mass/vol.air * f.air                         # app.rate.air [ug/m3]
   # above sets init air to same # of ug/m3 as surf conc is in g/m2
-  time         <- runif(n) * 365/sdata$use.freq                  # time [days]
-  vol.air      <- x$area.sur * x$height                          # vol.air [m3]
-  sm.mass.air  <- vol.air * x$sm.load.air                        # sm.mass.air [ug]
-  lg.mass.air  <- vol.air * x$lg.load.air                        # lg.mass.air [ug]
-  sm.mass.sur  <- x$area.sur * x$sm.load.sur                     # sm.mass.sur [ug]
-  lg.mass.sur  <- x$area.sur * x$lg.load.sur                     # lg.mass.sur [ug]
+  time         <- runif(n) * 365/sdata$use.freq                     # time [days]
+  
+  sm.mass.air  <- vol.air * x$sm.load.air                           # sm.mass.air [ug]
+  lg.mass.air  <- vol.air * x$lg.load.air                           # lg.mass.air [ug]
+  sm.mass.sur  <- x$area.sur * x$sm.load.sur                        # sm.mass.sur [ug]
+  lg.mass.sur  <- x$area.sur * x$lg.load.sur                        # lg.mass.sur [ug]
   sm.clean.sur <- pmax(x$sm.clean.sur,x$sm.depos*x$sm.load.air/x$sm.load.sur-x$sm.resus)
   lg.clean.sur <- pmax(x$lg.clean.sur,x$lg.depos*x$lg.load.air/x$lg.load.sur-x$lg.resus)
   # clean.sur [1/day], depos [m/day], load.air [ug/m3], load.sur [ug/m2], resus [1/day]
   sm.clean.air <- pmax(x$sm.clean.air,(x$sm.resus*sm.mass.sur-x$sm.depos*x$sm.load.air*x$area.sur)/sm.mass.air)
   lg.clean.air <- pmax(x$lg.clean.air,(x$lg.resus*lg.mass.sur-x$lg.depos*x$lg.load.air*x$area.sur)/lg.mass.air)
   # clean.air [1/day], resus [1/day], mass.sur [ug], depos [m/day], load.air [ug/m3], area.sur [m2], mass.air [ug]
-  ug.mol       <- 1E6*cfug$molwt                                 # ug.mol [ug/mol]
-  z.air        <- 1/(8.314*x$temp)                               # z.air [mol/(Pa m3)]
-  zvb.air      <- z.air * vol.air * ug.mol                       # zvb.air [ug/Pa]
-  z.sur        <- z.air * 82500 / (cfug$vapor^0.65)              # z.sur [mol/(Pa m3)]
-  zvb.sur      <- z.sur * x$area.sur * x$thick.sur * ug.mol      # zvb.sur [ug/Pa]
+  ug.mol       <- 1E6*cfug$molwt                                    # ug.mol [ug/mol]
+  z.air        <- 1/(8.314*x$temp)                                  # z.air [mol/(Pa m3)]
+  zvb.air      <- z.air * vol.air * ug.mol                          # zvb.air [ug/Pa]
+  z.sur        <- z.air * 82500 / (cfug$vapor^0.65)                 # z.sur [mol/(Pa m3)]
+  zvb.sur      <- z.sur * x$area.sur * x$thick.sur * ug.mol         # zvb.sur [ug/Pa]
   sm.kp        <- 1.662E-12 * cfug$kow * x$sm.carb.f * cfug$solub / (cfug$vapor * z.air)
   lg.kp        <- 1.662E-12 * cfug$kow * x$lg.carb.f * cfug$solub / (cfug$vapor * z.air)
   # kp [m3/ug], 1.662E-12 [m3/ug], kow [-], carb.f [-], solub [mol/m3], vapor [Pa], z.air [mol/(Pa m3)]
-  sm.zv.air    <- zvb.air * sm.kp * x$sm.load.air                # sm.zv.air [ug/Pa]
-  lg.zv.air    <- zvb.air * lg.kp * x$lg.load.air                # lg.zv.air [ug/Pa]
-  sm.cap       <- z.air * sm.kp * ug.mol                         # sm.cap [1/Pa]
-  lg.cap       <- z.air * lg.kp * ug.mol                         # lg.cap [1/Pa]
-  sm.zv.sur    <- sm.cap * sm.mass.sur                           # sm.zv.sur [ug/Pa]
-  lg.zv.sur    <- lg.cap * lg.mass.sur                           # lg.zv.sur [ug/Pa]
-  zv.air       <- zvb.air + sm.zv.air + lg.zv.air                # zv.air [ug/Pa]
-  zv.sur       <- zvb.sur + sm.zv.sur + lg.zv.sur                # zv.sur [ug/Pa]
-  izv.air      <- pmin(1E100,1/zv.air)                           # izv.air [Pa/ug]
-  izv.sur      <- pmin(1E100,1/zv.sur)                           # izv.sur [Pa/ug]
+  sm.zv.air    <- zvb.air * sm.kp * x$sm.load.air                   # sm.zv.air [ug/Pa]
+  lg.zv.air    <- zvb.air * lg.kp * x$lg.load.air                   # lg.zv.air [ug/Pa]
+  sm.cap       <- z.air * sm.kp * ug.mol                            # sm.cap [1/Pa]
+  lg.cap       <- z.air * lg.kp * ug.mol                            # lg.cap [1/Pa]
+  sm.zv.sur    <- sm.cap * sm.mass.sur                              # sm.zv.sur [ug/Pa]
+  lg.zv.sur    <- lg.cap * lg.mass.sur                              # lg.zv.sur [ug/Pa]
+  zv.air       <- zvb.air + sm.zv.air + lg.zv.air                   # zv.air [ug/Pa]
+  zv.sur       <- zvb.sur + sm.zv.sur + lg.zv.sur                   # zv.sur [ug/Pa]
+  izv.air      <- pmin(1E100,1/zv.air)                              # izv.air [Pa/ug]
+  izv.sur      <- pmin(1E100,1/zv.sur)                              # izv.sur [Pa/ug]
   yaf          <- pmin(cfug$diffus.air*z.air/x$thick.bou , 0.0135/(cfug$vapor^0.32))  # yaf [mol/(m2-Pa-day)]
   cln.air      <- izv.air * (sm.zv.air*sm.clean.air + lg.zv.air*lg.clean.air)         # cln.air [1/day]
   cln.sur      <- izv.sur * (sm.zv.sur*sm.clean.sur + lg.zv.sur*lg.clean.sur)         # cln.sur [1/day]
@@ -322,7 +327,7 @@ get.fug.concs = function(sdata,frac.chem,x,cfug) {
   m0.sur       <- (cfug$c.prev.sur + app.rate.sur) * x$area.sur                       # m0.sur [ug]
   src.air      <- cfug$c.out.air * x$aer.out * vol.air + cfug$c.src.air * vol.air     # src.air [ug/day]
   src.sur      <- cfug$c.src.sur * x$area.sur                                         # src.sur [ug/day]
-
+  
   a <- x$aer.out + cfug$decay.air + cln.air + dep + diff.air                          # a [1/day]
   b <- res + diff.sur                                                                 # b [1/day]
   c <- dep + diff.air                                                                 # c [1/day]
@@ -342,7 +347,7 @@ get.fug.concs = function(sdata,frac.chem,x,cfug) {
   k2.air   <-  (2*c*m.t0.air+(a-d+r)*m.t0.sur)*v2.air/(4*c*r)                         # k2.air [ug]
   k1.sur   <- -(2*c*m.t0.air+(a-d-r)*m.t0.sur)/(2*r)                                  # k1.sur [ug]
   k2.sur   <-  (2*c*m.t0.air+(a-d+r)*m.t0.sur)/(2*r)                                  # k2.sur [ug]
-
+  
   concs <- data.table(matrix(0,nrow=nrow(cfug),ncol=14))
   setnames(concs,1:14,c("seq","time","mass.air","mass.sur","conc.air","conc.sur",
                         "m0.air","m0.sur","q","k","gain","loss","cq0.air","cq0.sur"))
@@ -391,6 +396,7 @@ get.fug.concs = function(sdata,frac.chem,x,cfug) {
 #' @export
 
 get.y0.concs = function(sdata,chem.y0,pdmff,cfug) {
+  if (!exists("f.area",sdata)) sdata$f.area <- 1
   z.air       <- 1/(8.314*pdmff$temp)                       # z.air [mol/(Pa m3)]
   sm.kp       <- 1.662E-12 * cfug$kow * pdmff$sm.carb.f * cfug$solub / (cfug$vapor * z.air)
   lg.kp       <- 1.662E-12 * cfug$kow * pdmff$lg.carb.f * cfug$solub / (cfug$vapor * z.air)
@@ -401,14 +407,14 @@ get.y0.concs = function(sdata,chem.y0,pdmff,cfug) {
   y           <- chem.y0 / (1 + qstar/(cfug$h.y0*sdata$f.area*pdmff$area.sur))
   # y is average gas-phase .data$concentration in house in [ug/m3]
   ug.mol      <- 1E6*cfug$molwt                             # ug.mol [ug/mol]
-
+  
   zvb.air     <- z.air * vol.air * ug.mol                   # zvb.air [ug/Pa]
   fug         <- y / ug.mol / z.air                         # fug [Pa]
   # fug is the fugacity of the gas-phase component
-
+  
   conc.air    <- y * ( 1 + sm.kp*pdmff$sm.load.air + lg.kp*pdmff$lg.load.air)
   # conc.air is the (gas+particle) chemical concentration in air [ug/m3]
-
+  
   mass.air    <- conc.air * vol.air                        # mass.air [ug]
   # mass.air is the airborne chemical mass [ug]
   sm.mass.sur <- pdmff$area.sur * pdmff$sm.load.sur        # sm.mass.sur [ug]
